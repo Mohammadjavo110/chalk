@@ -33,6 +33,18 @@ Return a new Chalk instance.
 */
 export const Chalk: new (options?: Options) => ChalkInstance; // eslint-disable-line @typescript-eslint/naming-convention
 
+/**
+A semantic style chain: a dot-delimited string of static style names (for example `'red.bold'`), or an array of static style names (for example `['red', 'bold']`).
+
+Only static styles are allowed. Argument-taking styles such as `rgb`, `hex`, `ansi256` and their `bg`/`underline` variants throw.
+*/
+export type ThemeStyleDefinition = string | readonly string[];
+
+/**
+Map of custom semantic style names to their style chains.
+*/
+export type ThemeDefinitions = Readonly<Record<string, ThemeStyleDefinition>>;
+
 export interface ChalkInstance {
 	(...text: unknown[]): string;
 
@@ -50,6 +62,72 @@ export interface ChalkInstance {
 	@throws If the assigned value is not an integer from 0 to 3.
 	*/
 	level: ColorSupportLevel;
+
+	/**
+	Format text as an error message (red + bold).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.error('Something went wrong');
+	```
+	*/
+	readonly error: this;
+
+	/**
+	Format text as a warning message (yellow + bold).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.warn('Careful there');
+	```
+	*/
+	readonly warn: this;
+
+	/**
+	Format text as an informational message (blue).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.info('Update available');
+	```
+	*/
+	readonly info: this;
+
+	/**
+	Format text as a success message (green).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.success('All tests passed');
+	```
+	*/
+	readonly success: this;
+
+	/**
+	Define one or more custom semantic styles that become directly available on the Chalk instance (for example `chalk.defineTheme({highlight: 'magenta.bold'})` makes `chalk.highlight('...')` callable). All registered styles are available on every Chalk instance, including `chalkStderr` and newly created instances.
+
+	@param definitions - Map of custom style names to style chains. Only static styles are allowed; argument-taking styles such as `rgb`, `hex`, and `ansi256` throw.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.defineTheme({highlight: 'magenta.bold'});
+
+	chalk.highlight('Highlighted text');
+	```
+
+	@throws If a style name collides with a built-in property or is already defined, or if a chain contains an unknown or non-static style.
+	*/
+	defineTheme: (definitions: ThemeDefinitions) => this;
 
 	/**
 	Use RGB values to set text color.

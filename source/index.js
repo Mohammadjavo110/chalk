@@ -49,11 +49,11 @@ export class Chalk {
 	}
 }
 
-const chalkFactory = options => {
+const chalkFactory = (options, chalkProto = createChalk.prototype) => {
 	const chalk = (...strings) => strings.join(' ');
 	applyOptions(chalk, options);
 
-	Object.setPrototypeOf(chalk, createChalk.prototype);
+	Object.setPrototypeOf(chalk, chalkProto);
 
 	return chalk;
 };
@@ -235,6 +235,258 @@ const applyStyle = (self, string) => {
 // `level` lives on the prototype rather than on each instance, so it costs nothing to construct an instance and matches how builders already expose it. It is inherited rather than own, so it does not show up in `Object.keys()`, same as for a builder.
 // eslint-disable-next-line unicorn/no-top-level-side-effects -- The style getters must be installed at module load.
 Object.defineProperties(createChalk.prototype, {...styles, level: levelDescriptor});
+
+// === THEME SYSTEM ===
+//
+// A theme is a named, reusable style chain that produces a builder rooted at the
+// instance that requested it, so `chalk.level = 0` immediately propagates to all
+// theme-derived builders. Themes support both registration via `chalk.theme({...})`
+// and direct access via `chalk.theme.<name>(...)`. Style names that take arguments
+// at call time (e.g. `rgb`, `hex`, `ansi256`) are forbidden inside theme chains
+// because their getter returns a function rather than a builder.
+
+const RESERVED_THEME_NAMES = new Set(['level', 'theme']);
+
+const DEFAULT_THEMES = {
+	error: 'red.bold',
+	warn: 'yellow.bold',
+	info: 'blue',
+	success: 'green',
+};
+
+// Build the set of style names whose getter returns a function taking call-site
+// arguments (`rgb`, `bgHex`, `underlineAnsi256`, …). These cannot appear inside a
+// theme chain because they don't compose through the normal builder path.
+const DYNAMIC_STYLE_NAMES = new Set();
+for (const model of usedModels) {
+	const capitalizedModel = model[0].toUpperCase() + model.slice(1);
+	DYNAMIC_STYLE_NAMES.add(model);
+	DYNAMIC_STYLE_NAMES.add('bg' + capitalizedModel);
+	DYNAMIC_STYLE_NAMES.add('underline' + capitalizedModel);
+}
+
+const isStaticStyle = name =>
+	Object.hasOwn(styles, name)
+	&& !DYNAMIC_STYLE_NAMES.has(name);
+
+const isThemeDefinition = value =>
+	value !== null
+	&& typeof value === 'object'
+	&& !Array.isArray(value);
+
+const parseThemeChain = definition => {
+	if (typeof definition === 'string') {
+		return definition.split('.');
+	}
+
+	if (Array.isArray(definition)) {
+		return [...definition];
+	}
+
+	throw new TypeError('Theme style definition must be a string or an array of strings');
+};
+
+const validateThemeChain = chain => {
+	if (chain.length === 0) {
+		throw new Error('Theme style chain cannot be empty');
+	}
+
+	for (const part of chain) {
+		if (typeof part !== 'string' || part.length === 0) {
+			throw new Error('Each style name in a theme chain must be a non-empty string');
+		}
+
+		if (!isStaticStyle(part)) {
+			throw new Error(`Unknown or non-static style "${part}" in theme definition. Only static styles are allowed.`);
+		}
+	}
+
+	return chain;
+};
+
+const assertValidThemeName = name => {
+	if (typeof name !== 'string' || name.length === 0) {
+		throw new TypeError('Theme name must be a non-empty string');
+	}
+
+	if (RESERVED_THEME_NAMES.has(name)) {
+		throw new Error(`Theme name "${name}" is reserved`);
+	}
+};
+
+const defineThemeGetter = (targetProto, name, chain, chalkRoot) => {
+	Object.defineProperty(targetProto, name, {
+		enumerable: true,
+		configurable: true,
+		get() {
+			let builder = chalkRoot;
+			for (const styleName of chain) {
+				builder = builder[styleName];
+			}
+
+			Object.defineProperty(this, name, {value: builder, configurable: true, enumerable: true});
+			return builder;
+		},
+	});
+};
+
+const THEME_CACHE = Symbol('THEME_CACHE');
+
+const createThemeFor = chalkRoot => {
+	const themeProto = Object.create(createChalk.prototype);
+
+	for (const [name, definition] of Object.entries(DEFAULT_THEMES)) {
+		assertValidThemeName(name);
+		if (Object.hasOwn(themeProto, name)) {
+			throw new Error(`Theme "${name}" is already defined`);
+		}
+
+		const chain = validateThemeChain(parseThemeChain(definition));
+		defineThemeGetter(themeProto, name, chain, chalkRoot);
+	}
+
+	const themeInstance = chalkFactory({}, themeProto);
+
+	const themeFunction = function (...args) {
+		if (args.length === 1 && isThemeDefinition(args[0])) {
+			const definitions = args[0];
+
+			for (const [name, definition] of Object.entries(definitions)) {
+				assertValidThemeName(name);
+				if (Object.hasOwn(themeProto, name)) {
+					throw new Error(`Theme "${name}" is already defined`);
+				}
+
+				const chain = validateThemeChain(parseThemeChain(definition));
+				defineThemeGetter(themeProto, name, chain, chalkRoot);
+			}
+
+			return themeFunction;
+		}
+
+		return Reflect.apply(themeInstance, this, args);
+	};
+
+	Object.setPrototypeOf(themeFunction, themeInstance);
+	return themeFunction;
+};
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The legacy `theme` namespace must be installed on the shared prototype at module load.
+Object.defineProperty(createChalk.prototype, 'theme', {
+	configurable: true,
+	enumerable: false,
+	get() {
+		const cached = this[THEME_CACHE];
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		const theme = createThemeFor(this);
+		this[THEME_CACHE] = theme;
+		return theme;
+	},
+});
+
+// === SEMANTIC STYLES ===
+//
+// Semantic styles (`error`, `warn`, `info`, `success`) and any custom style
+// registered through `chalk.defineTheme({...})` are installed as lazy getters
+// on the shared `createChalk.prototype`, so they are available on the default
+// `chalk` instance, `chalkStderr`, and every `new Chalk()` instance.
+//
+// A getter walks its style chain through the normal builder system on first
+// access and caches the resulting builder on the requesting instance, so no
+// ANSI code string is ever cached: setting `chalk.level = 0` in the middle of
+// a program makes every semantic style output plain text immediately, just
+// like any other chalk style.
+
+const DEFAULT_SEMANTIC_STYLES = {
+	error: ['red', 'bold'],
+	warn: ['yellow', 'bold'],
+	info: ['blue'],
+	success: ['green'],
+};
+
+// Names that exist on every instance (or the shared prototype) and therefore
+// can never be used as a semantic style name.
+const SEMANTIC_STYLE_BASE_NAMES = new Set([
+	'level',
+	'enabled',
+	'constructor',
+	'theme',
+	'defineTheme',
+	'__proto__',
+]);
+
+// Names already taken by a custom style registered through `defineTheme`.
+const REGISTERED_SEMANTIC_STYLES = new Set();
+
+const assertValidSemanticStyleName = name => {
+	if (typeof name !== 'string' || name.length === 0) {
+		throw new TypeError('Style name must be a non-empty string');
+	}
+
+	if (
+		SEMANTIC_STYLE_BASE_NAMES.has(name)
+		|| Object.hasOwn(styles, name)
+		|| Object.hasOwn(DEFAULT_SEMANTIC_STYLES, name)
+	) {
+		throw new Error(`Theme style name "${name}" collides with a built-in property`);
+	}
+
+	if (REGISTERED_SEMANTIC_STYLES.has(name)) {
+		throw new Error(`Theme style name "${name}" is already defined`);
+	}
+};
+
+const defineSemanticStyleGetter = (name, chain) => {
+	Object.defineProperty(createChalk.prototype, name, {
+		configurable: true,
+		enumerable: false,
+		get() {
+			const [firstStyle, ...restStyles] = chain;
+			let builder = this[firstStyle];
+			for (const styleName of restStyles) {
+				builder = builder[styleName];
+			}
+
+			// Cache the resolved builder on the requesting instance. The builder is
+			// rooted at that instance, so the level is still read live at call time
+			// and `chalk.level = 0` keeps working after the first access.
+			Object.defineProperty(this, name, {value: builder, configurable: true});
+			return builder;
+		},
+	});
+
+	REGISTERED_SEMANTIC_STYLES.add(name);
+};
+
+for (const [name, definition] of Object.entries(DEFAULT_SEMANTIC_STYLES)) {
+	defineSemanticStyleGetter(name, validateThemeChain(parseThemeChain(definition)));
+}
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The `defineTheme` method must be installed on the shared prototype at module load.
+Object.defineProperty(createChalk.prototype, 'defineTheme', {
+	configurable: true,
+	enumerable: false,
+	value(definitions) {
+		if (!isThemeDefinition(definitions)) {
+			throw new TypeError('Theme definitions must be an object of style names to style chains');
+		}
+
+		// Validate every entry first, so a bad definition cannot partially register the good ones.
+		const registrations = Object.entries(definitions).map(([name, definition]) => {
+			assertValidSemanticStyleName(name);
+			return [name, validateThemeChain(parseThemeChain(definition))];
+		});
+
+		for (const [name, chain] of registrations) {
+			defineSemanticStyleGetter(name, chain);
+		}
+
+		return this;
+	},
+});
 
 const chalk = createChalk();
 export const chalkStderr = createChalk({level: stderrColor ? stderrColor.level : 0});

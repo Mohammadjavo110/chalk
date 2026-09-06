@@ -1,0 +1,2816 @@
+Directory structure:
+└── chalk/
+    ├── readme.md
+    ├── benchmark.js
+    ├── code-of-conduct.md
+    ├── contributing.md
+    ├── license
+    ├── package.json
+    ├── .editorconfig
+    ├── .npmrc
+    ├── examples/
+    │   ├── rainbow.js
+    │   └── screenshot.js
+    ├── source/
+    │   ├── index.d.ts
+    │   ├── index.js
+    │   └── utilities.js
+    ├── test/
+    │   ├── _fixture.js
+    │   ├── _force-color-fixture.js
+    │   ├── chalk.js
+    │   ├── force-color.js
+    │   ├── instance.js
+    │   ├── level.js
+    │   ├── no-color-support.js
+    │   ├── theme.js
+    │   └── visible.js
+    └── .github/
+        ├── funding.yml
+        ├── security.md
+        └── workflows/
+            └── main.yml
+
+================================================
+FILE: readme.md
+================================================
+<h1 align="center">
+	<br>
+	<br>
+	<img width="320" src="media/logo.svg" alt="Chalk">
+	<br>
+	<br>
+	<br>
+</h1>
+
+> Terminal string styling done right
+
+[![Coverage Status](https://codecov.io/gh/chalk/chalk/branch/main/graph/badge.svg)](https://codecov.io/gh/chalk/chalk)
+[![npm dependents](https://badgen.net/npm/dependents/chalk)](https://www.npmjs.com/package/chalk?activeTab=dependents)
+[![Downloads](https://badgen.net/npm/dt/chalk)](https://www.npmjs.com/package/chalk)
+
+![](media/screenshot.png)
+
+## Info
+
+- [Why not switch to a smaller coloring package?](https://github.com/chalk/chalk?tab=readme-ov-file#why-not-switch-to-a-smaller-coloring-package)
+- See [yoctocolors](https://github.com/sindresorhus/yoctocolors) for a smaller alternative
+
+## Highlights
+
+- Expressive API
+- Highly performant
+- No dependencies
+- Ability to nest styles
+- [256/Truecolor color support](#256-and-truecolor-color-support)
+- Auto-detects color support
+- Doesn't extend `String.prototype`
+- Clean and focused
+- Actively maintained
+- [Used by ~115,000 packages](https://www.npmjs.com/browse/depended/chalk) as of July 4, 2024
+
+## Install
+
+```sh
+npm install chalk
+```
+
+**IMPORTANT:** Chalk 5 is ESM. If you want to use Chalk with TypeScript or a build tool, you will probably want to use Chalk 4 for now. [Read more.](https://github.com/chalk/chalk/releases/tag/v5.0.0)
+
+## Usage
+
+```js
+import chalk from 'chalk';
+
+console.log(chalk.blue('Hello world!'));
+```
+
+Chalk comes with an easy to use composable API where you just chain and nest the styles you want.
+
+```js
+import chalk from 'chalk';
+
+const log = console.log;
+
+// Combine styled and normal strings
+log(chalk.blue('Hello') + ' World' + chalk.red('!'));
+
+// Compose multiple styles using the chainable API
+log(chalk.blue.bgRed.bold('Hello world!'));
+
+// Pass in multiple arguments
+log(chalk.blue('Hello', 'World!', 'Foo', 'bar', 'biz', 'baz'));
+
+// Nest styles
+log(chalk.red('Hello', chalk.underline.bgBlue('world') + '!'));
+
+// Nest styles of the same type even (color, underline, background)
+log(chalk.green(
+	'I am a green line ' +
+	chalk.blue.underline.bold('with a blue substring') +
+	' that becomes green again!'
+));
+
+// ES2015 template literal
+log(`
+CPU: ${chalk.red('90%')}
+RAM: ${chalk.green('40%')}
+DISK: ${chalk.yellow('70%')}
+`);
+
+// Use RGB colors in terminal emulators that support it.
+log(chalk.rgb(123, 45, 67).underline('Underlined reddish color'));
+log(chalk.hex('#DEADED').bold('Bold gray!'));
+```
+
+Easily define your own themes:
+
+```js
+import chalk from 'chalk';
+
+const error = chalk.bold.red;
+const warning = chalk.hex('#FFA500'); // Orange color
+
+console.log(error('Error!'));
+console.log(warning('Warning!'));
+```
+
+Take advantage of console.log [string substitution](https://nodejs.org/docs/latest/api/console.html#console_console_log_data_args):
+
+```js
+import chalk from 'chalk';
+
+const name = 'Sindre';
+console.log(chalk.green('Hello %s'), name);
+//=> 'Hello Sindre'
+```
+
+## API
+
+### chalk.`<style>[.<style>...](string, [string...])`
+
+Example: `chalk.red.bold.underline('Hello', 'world');`
+
+Chain [styles](#styles) and call the last one as a method with a string argument. Order doesn't matter, and later styles take precedent in case of a conflict. This simply means that `chalk.red.yellow.green` is equivalent to `chalk.green`.
+
+Multiple arguments will be separated by space.
+
+### chalk.level
+
+Specifies the level of color support.
+
+Color support is automatically detected, but you can override it by setting the `level` property. You should however only do this in your own code as it applies globally to all Chalk consumers.
+
+If you need to change this in a reusable module, create a new instance:
+
+```js
+import {Chalk} from 'chalk';
+
+const customChalk = new Chalk({level: 0});
+```
+
+| Level | Description |
+| :---: | :--- |
+| `0` | All colors disabled |
+| `1` | Basic color support (16 colors) |
+| `2` | 256 color support |
+| `3` | Truecolor support (16 million colors) |
+
+Both the `level` option and the `level` property throw for anything that is not an integer from 0 to 3. Omit the option, or pass `undefined`, to have the level detected instead.
+
+### supportsColor
+
+Detect whether the terminal [supports color](https://github.com/chalk/supports-color). Used internally and handled for you, but exposed for convenience.
+
+Can be overridden by the user with the flags `--color` and `--no-color`. For situations where using `--color` is not possible, use the environment variable `FORCE_COLOR=1` (level 1), `FORCE_COLOR=2` (level 2), or `FORCE_COLOR=3` (level 3) to forcefully enable color, or `FORCE_COLOR=0` to forcefully disable. A numeric `FORCE_COLOR` overrides the detected color support and sets the level directly, meaning the terminal cannot raise it to a higher level. Use `FORCE_COLOR=true` to instead only enable color and let the level be detected.
+
+Explicit 256/Truecolor mode can be enabled using the `--color=256` and `--color=16m` flags, respectively. These take precedence over a non-zero numeric `FORCE_COLOR`.
+
+### chalkStderr and supportsColorStderr
+
+`chalkStderr` contains a separate instance configured with color support detected for `stderr` stream instead of `stdout`. Override rules from `supportsColor` apply to this too. `supportsColorStderr` is exposed for convenience.
+
+### modifierNames, foregroundColorNames, backgroundColorNames, underlineColorNames, and colorNames
+
+All supported style strings are exposed as an array of strings for convenience. `colorNames` is the combination of `foregroundColorNames` and `backgroundColorNames`. Underline color names are kept separate in `underlineColorNames`.
+
+This can be useful if you wrap Chalk and need to validate input:
+
+```js
+import {modifierNames, foregroundColorNames} from 'chalk';
+
+console.log(modifierNames.includes('bold'));
+//=> true
+
+console.log(foregroundColorNames.includes('pink'));
+//=> false
+```
+
+## Styles
+
+### Modifiers
+
+- `reset` - Reset the current style.
+- `bold` - Make the text bold.
+- `dim` - Make the text have lower opacity.
+- `italic` - Make the text italic. *(Not widely supported)*
+- `underline` - Put a horizontal line below the text. *(Not widely supported)*
+- `underlineDouble` - Put a double horizontal line below the text. *(Not widely supported)*
+- `underlineCurly` - Put a curly horizontal line below the text. *(Not widely supported)*
+- `underlineDotted` - Put a dotted horizontal line below the text. *(Not widely supported)*
+- `underlineDashed` - Put a dashed horizontal line below the text. *(Not widely supported)*
+- `overline` - Put a horizontal line above the text. *(Not widely supported)*
+- `inverse` - Invert background and foreground colors.
+- `hidden` - Print the text but make it invisible.
+- `strikethrough` - Puts a horizontal line through the center of the text. *(Not widely supported)*
+- `visible` - Print the text only when Chalk has a color level above zero. Can be useful for things that are purely cosmetic.
+
+### Colors
+
+- `black`
+- `red`
+- `green`
+- `yellow`
+- `blue`
+- `magenta`
+- `cyan`
+- `white`
+- `blackBright` (alias: `gray`, `grey`)
+- `redBright`
+- `greenBright`
+- `yellowBright`
+- `blueBright`
+- `magentaBright`
+- `cyanBright`
+- `whiteBright`
+
+### Background colors
+
+- `bgBlack`
+- `bgRed`
+- `bgGreen`
+- `bgYellow`
+- `bgBlue`
+- `bgMagenta`
+- `bgCyan`
+- `bgWhite`
+- `bgBlackBright` (alias: `bgGray`, `bgGrey`)
+- `bgRedBright`
+- `bgGreenBright`
+- `bgYellowBright`
+- `bgBlueBright`
+- `bgMagentaBright`
+- `bgCyanBright`
+- `bgWhiteBright`
+
+### Underline colors
+
+The underline color is set independently of the text color, so the color is only visible when an underline style is also applied. For example, `chalk.underlineRed.underlineCurly('typo')` renders a red squiggle below otherwise unstyled text. *(Not widely supported)*
+
+Unlike text and background colors, there is no basic 16-color form for underline colors, so they always use the 256-color escape. At level 1 they are downsampled to the first 16 palette entries rather than to a basic color code.
+
+- `underlineBlack`
+- `underlineRed`
+- `underlineGreen`
+- `underlineYellow`
+- `underlineBlue`
+- `underlineMagenta`
+- `underlineCyan`
+- `underlineWhite`
+- `underlineBlackBright` (alias: `underlineGray`, `underlineGrey`)
+- `underlineRedBright`
+- `underlineGreenBright`
+- `underlineYellowBright`
+- `underlineBlueBright`
+- `underlineMagentaBright`
+- `underlineCyanBright`
+- `underlineWhiteBright`
+
+## 256 and Truecolor color support
+
+Chalk supports 256 colors and [Truecolor](https://github.com/termstandard/colors) (16 million colors) on supported terminal apps.
+
+Colors are downsampled from 16 million RGB values to an ANSI color format that is supported by the terminal emulator (or by specifying `{level: n}` as a Chalk option). For example, Chalk configured to run at level 1 (basic color support) will downsample an RGB value of #FF0000 (red) to 91 (ANSI escape for bright red). The same applies to `ansi256` values, so `chalk.ansi256(196)` also becomes 91 at level 1.
+
+Examples:
+
+- `chalk.hex('#DEADED').underline('Hello, world!')`
+- `chalk.rgb(15, 100, 204).inverse('Hello!')`
+
+Background versions of these models are prefixed with `bg` and the first letter of the model capitalized (e.g. `hex` for foreground colors and `bgHex` for background colors).
+
+- `chalk.bgHex('#DEADED').underline('Hello, world!')`
+- `chalk.bgRgb(15, 100, 204).inverse('Hello!')`
+
+Underline versions are prefixed with `underline` in the same way (e.g. `hex` for foreground colors and `underlineHex` for underline colors). They only take effect when an underline style is also applied.
+
+- `chalk.underlineHex('#DEADED').underlineCurly('Hello, world!')`
+- `chalk.underlineRgb(15, 100, 204).underline('Hello!')`
+
+The following color models can be used:
+
+- [`rgb`](https://en.wikipedia.org/wiki/RGB_color_model) - Example: `chalk.rgb(255, 136, 0).bold('Orange!')`
+- [`hex`](https://en.wikipedia.org/wiki/Web_colors#Hex_triplet) - Example: `chalk.hex('#FF8800').bold('Orange!')`
+- [`ansi256`](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) - Example: `chalk.bgAnsi256(194)('Honeydew, more or less')`
+
+## Browser support
+
+Since Chrome 69, ANSI escape codes are natively supported in the developer console.
+
+## Windows
+
+If you're on Windows, do yourself a favor and use [Windows Terminal](https://github.com/microsoft/terminal) instead of `cmd.exe`.
+
+## FAQ
+
+### Why not switch to a smaller coloring package?
+
+Chalk may be larger, but there is a reason for that. It offers a more user-friendly API, well-documented types, supports millions of colors, and covers edge cases that smaller alternatives miss. Chalk is mature, reliable, and built to last.
+
+But beyond the technical aspects, there's something more critical: trust and long-term maintenance. I have been active in open source for over a decade, and I'm committed to keeping Chalk maintained. Smaller packages might seem appealing now, but there's no guarantee they will be around for the long term, or that they won't become malicious over time.
+
+Chalk is also likely already in your dependency tree (since 100K+ packages depend on it), so switching wonâ€™t save spaceâ€”in fact, it might increase it. npm deduplicates dependencies, so multiple Chalk instances turn into one, but adding another package alongside it will increase your overall size.
+
+If the goal is to clean up the ecosystem, switching away from Chalk wonâ€™t even make a dent. The real problem lies with packages that have very deep dependency trees (for example, those including a lot of polyfills). Chalk has no dependencies. It's better to focus on impactful changes rather than minor optimizations.
+
+If absolute package size is important to you, I also maintain [yoctocolors](https://github.com/sindresorhus/yoctocolors), one of the smallest color packages out there.
+
+*\- [Sindre](https://github.com/sindresorhus)*
+
+### But the smaller coloring package has benchmarks showing it is faster
+
+[Micro-benchmarks are flawed](https://sindresorhus.com/blog/micro-benchmark-fallacy) because they measure performance in unrealistic, isolated scenarios, often giving a distorted view of real-world performance. Don't believe marketing fluff. All the coloring packages are more than fast enough.
+
+## Related
+
+- [chalk-template](https://github.com/chalk/chalk-template) - [Tagged template literals](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Template_literals#tagged_templates) support for this module
+- [chalk-cli](https://github.com/chalk/chalk-cli) - CLI for this module
+- [ansi-styles](https://github.com/chalk/ansi-styles) - ANSI escape codes for styling strings in the terminal
+- [supports-color](https://github.com/chalk/supports-color) - Detect whether a terminal supports color
+- [strip-ansi](https://github.com/chalk/strip-ansi) - Strip ANSI escape codes
+- [strip-ansi-stream](https://github.com/chalk/strip-ansi-stream) - Strip ANSI escape codes from a stream
+- [has-ansi](https://github.com/chalk/has-ansi) - Check if a string has ANSI escape codes
+- [ansi-regex](https://github.com/chalk/ansi-regex) - Regular expression for matching ANSI escape codes
+- [wrap-ansi](https://github.com/chalk/wrap-ansi) - Wordwrap a string with ANSI escape codes
+- [slice-ansi](https://github.com/chalk/slice-ansi) - Slice a string with ANSI escape codes
+- [color-convert](https://github.com/qix-/color-convert) - Converts colors between different models
+- [chalk-animation](https://github.com/bokub/chalk-animation) - Animate strings in the terminal
+- [gradient-string](https://github.com/bokub/gradient-string) - Apply color gradients to strings
+- [chalk-pipe](https://github.com/LitoMore/chalk-pipe) - Create chalk style schemes with simpler style strings
+- [terminal-link](https://github.com/sindresorhus/terminal-link) - Create clickable links in the terminal
+
+*(Not accepting additional entries)*
+
+## Maintainers
+
+- [Sindre Sorhus](https://github.com/sindresorhus)
+- [Josh Junon](https://github.com/qix-)
+
+
+
+================================================
+FILE: benchmark.js
+================================================
+/* globals suite, bench */
+import chalk from './source/index.js';
+
+suite('chalk', () => {
+	const chalkRed = chalk.red;
+	const chalkBgRed = chalk.bgRed;
+	const chalkBlueBgRed = chalk.blue.bgRed;
+	const chalkBlueBgRedBold = chalk.blue.bgRed.bold;
+
+	const blueStyledString = 'the fox jumps' + chalk.blue('over the lazy dog') + '!';
+
+	bench('1 style', () => {
+		chalk.red('the fox jumps over the lazy dog');
+	});
+
+	bench('2 styles', () => {
+		chalk.blue.bgRed('the fox jumps over the lazy dog');
+	});
+
+	bench('3 styles', () => {
+		chalk.blue.bgRed.bold('the fox jumps over the lazy dog');
+	});
+
+	bench('cached: 1 style', () => {
+		chalkRed('the fox jumps over the lazy dog');
+	});
+
+	bench('cached: 2 styles', () => {
+		chalkBlueBgRed('the fox jumps over the lazy dog');
+	});
+
+	bench('cached: 3 styles', () => {
+		chalkBlueBgRedBold('the fox jumps over the lazy dog');
+	});
+
+	bench('cached: 1 style with newline', () => {
+		chalkRed('the fox jumps\nover the lazy dog');
+	});
+
+	bench('cached: 1 style nested intersecting', () => {
+		chalkRed(blueStyledString);
+	});
+
+	bench('cached: 1 style nested non-intersecting', () => {
+		chalkBgRed(blueStyledString);
+	});
+
+	bench('cached: 1 style template literal', () => {
+		// eslint-disable-next-line no-unused-expressions
+		chalkRed`the fox jumps over the lazy dog`;
+	});
+
+	bench('cached: nested styles template literal', () => {
+		// eslint-disable-next-line no-unused-expressions
+		chalkRed`the fox {bold jumps} over the {underline lazy} dog`;
+	});
+});
+
+
+
+================================================
+FILE: code-of-conduct.md
+================================================
+# Contributor Covenant Code of Conduct
+
+## Our Pledge
+
+In the interest of fostering an open and welcoming environment, we as
+contributors and maintainers pledge to making participation in our project and
+our community a harassment-free experience for everyone, regardless of age, body
+size, disability, ethnicity, gender identity and expression, level of experience,
+nationality, personal appearance, race, religion, or sexual identity and
+orientation.
+
+## Our Standards
+
+Examples of behavior that contributes to creating a positive environment
+include:
+
+* Using welcoming and inclusive language
+* Being respectful of differing viewpoints and experiences
+* Gracefully accepting constructive criticism
+* Focusing on what is best for the community
+* Showing empathy towards other community members
+
+Examples of unacceptable behavior by participants include:
+
+* The use of sexualized language or imagery and unwelcome sexual attention or
+advances
+* Trolling, insulting/derogatory comments, and personal or political attacks
+* Public or private harassment
+* Publishing others' private information, such as a physical or electronic
+  address, without explicit permission
+* Other conduct which could reasonably be considered inappropriate in a
+  professional setting
+
+## Our Responsibilities
+
+Project maintainers are responsible for clarifying the standards of acceptable
+behavior and are expected to take appropriate and fair corrective action in
+response to any instances of unacceptable behavior.
+
+Project maintainers have the right and responsibility to remove, edit, or
+reject comments, commits, code, wiki edits, issues, and other contributions
+that are not aligned to this Code of Conduct, or to ban temporarily or
+permanently any contributor for other behaviors that they deem inappropriate,
+threatening, offensive, or harmful.
+
+## Scope
+
+This Code of Conduct applies both within project spaces and in public spaces
+when an individual is representing the project or its community. Examples of
+representing a project or community include using an official project e-mail
+address, posting via an official social media account, or acting as an appointed
+representative at an online or offline event. Representation of a project may be
+further defined and clarified by project maintainers.
+
+## Enforcement
+
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported by contacting the project team at sindresorhus@gmail.com. All
+complaints will be reviewed and investigated and will result in a response that
+is deemed necessary and appropriate to the circumstances. The project team is
+obligated to maintain confidentiality with regard to the reporter of an incident.
+Further details of specific enforcement policies may be posted separately.
+
+Project maintainers who do not follow or enforce the Code of Conduct in good
+faith may face temporary or permanent repercussions as determined by other
+members of the project's leadership.
+
+## Attribution
+
+This Code of Conduct is adapted from the [Contributor Covenant][homepage], version 1.4,
+available at [http://contributor-covenant.org/version/1/4][version]
+
+[homepage]: http://contributor-covenant.org
+[version]: http://contributor-covenant.org/version/1/4/
+
+
+
+================================================
+FILE: contributing.md
+================================================
+# Contributing to Chalk
+
+Please note that this project is released with a [Contributor Code of Conduct](code-of-conduct.md). By participating in this project you agree to abide by its terms.
+
+
+
+================================================
+FILE: license
+================================================
+MIT License
+
+Copyright (c) Sindre Sorhus <sindresorhus@gmail.com> (https://sindresorhus.com)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+
+================================================
+FILE: package.json
+================================================
+{
+	"name": "chalk",
+	"version": "6.0.0",
+	"description": "Terminal string styling done right",
+	"license": "MIT",
+	"repository": "chalk/chalk",
+	"funding": "https://github.com/chalk/chalk?sponsor=1",
+	"type": "module",
+	"exports": {
+		"types": "./source/index.d.ts",
+		"default": "./source/index.js"
+	},
+	"imports": {
+		"#ansi-styles": "./source/vendor/ansi-styles/index.js",
+		"#supports-color": {
+			"node": "./source/vendor/supports-color/index.js",
+			"default": "./source/vendor/supports-color/browser.js"
+		}
+	},
+	"sideEffects": false,
+	"engines": {
+		"node": ">=22"
+	},
+	"scripts": {
+		"test": "xo && c8 ava && tsc --noEmit --types node source/index.d.ts",
+		"bench": "matcha benchmark.js"
+	},
+	"files": [
+		"source"
+	],
+	"keywords": [
+		"color",
+		"colour",
+		"colors",
+		"terminal",
+		"console",
+		"cli",
+		"string",
+		"ansi",
+		"style",
+		"styles",
+		"tty",
+		"formatting",
+		"rgb",
+		"256",
+		"shell",
+		"xterm",
+		"log",
+		"logging",
+		"command-line",
+		"text"
+	],
+	"devDependencies": {
+		"@types/node": "^26.1.1",
+		"ansi-styles": "^6.2.3",
+		"ava": "^8.0.1",
+		"c8": "^12.0.0",
+		"color-convert": "^3.1.3",
+		"execa": "^10.0.0",
+		"log-update": "^8.0.0",
+		"matcha": "^0.7.0",
+		"typescript": "^6.0.3",
+		"xo": "^4.0.0",
+		"yoctodelay": "^2.0.0"
+	},
+	"xo": [
+		{
+			"ignores": [
+				"source/vendor",
+				"source/**/*.d.ts"
+			]
+		},
+		{
+			"rules": {
+				"unicorn/prefer-string-slice": "off",
+				"@typescript-eslint/consistent-type-imports": "off",
+				"@typescript-eslint/consistent-type-exports": "off",
+				"@typescript-eslint/consistent-type-definitions": "off",
+				"unicorn/expiring-todo-comments": "off",
+				"no-warning-comments": "off"
+			}
+		}
+	],
+	"c8": {
+		"reporter": [
+			"text",
+			"lcov"
+		],
+		"exclude": [
+			"source/vendor"
+		]
+	}
+}
+
+
+
+================================================
+FILE: .editorconfig
+================================================
+root = true
+
+[*]
+indent_style = tab
+end_of_line = lf
+charset = utf-8
+trim_trailing_whitespace = true
+insert_final_newline = true
+
+[*.yml]
+indent_style = space
+indent_size = 2
+
+
+
+================================================
+FILE: .npmrc
+================================================
+package-lock=false
+
+
+
+================================================
+FILE: examples/rainbow.js
+================================================
+import {setTimeout as delay} from 'node:timers/promises';
+import convertColor from 'color-convert';
+import updateLog from 'log-update';
+import chalk from '../source/index.js';
+
+const ignoreCharacters = /[^\u{0021}-\u{007E}]/gv;
+
+function rainbow(string, offset) {
+	if (!string || string.length === 0) {
+		return string;
+	}
+
+	const hueStep = 360 / string.replaceAll(ignoreCharacters, '').length;
+
+	let hue = offset % 360;
+	const characters = [];
+	for (const character of string) {
+		if (ignoreCharacters.test(character)) {
+			characters.push(character);
+		} else {
+			characters.push(chalk.hex(convertColor.hsl.hex(hue, 100, 50))(character));
+			hue = (hue + hueStep) % 360;
+		}
+	}
+
+	return characters.join('');
+}
+
+async function animateString(string) {
+	for (let index = 0; index < 360 * 5; index++) {
+		updateLog(rainbow(string, index));
+		await delay(2); // eslint-disable-line no-await-in-loop
+	}
+}
+
+console.log();
+await animateString('We hope you enjoy Chalk! <3');
+console.log();
+
+
+
+================================================
+FILE: examples/screenshot.js
+================================================
+import process from 'node:process';
+import styles from 'ansi-styles';
+import chalk from '../source/index.js';
+
+// Generates screenshot
+for (const key of Object.keys(styles)) {
+	let returnValue = key;
+
+	// We skip `overline` as almost no terminal supports it so we cannot show it off.
+	if (
+		key === 'reset'
+		|| key === 'hidden'
+		|| key === 'grey'
+		|| key === 'bgGray'
+		|| key === 'bgGrey'
+		|| key === 'overline'
+		|| key.endsWith('Bright')
+	) {
+		continue;
+	}
+
+	if (/^bg[^B]/v.test(key)) {
+		returnValue = chalk.black(returnValue);
+	}
+
+	process.stdout.write(chalk[key](returnValue) + ' ');
+}
+
+
+
+================================================
+FILE: source/index.d.ts
+================================================
+// TODO: Make it this when TS supports that.
+// import {ModifierName, ForegroundColor, BackgroundColor, ColorName} from '#ansi-styles';
+// import {ColorInfo, ColorSupportLevel} from '#supports-color';
+import {
+	ModifierName,
+	ForegroundColorName,
+	BackgroundColorName,
+	ColorName,
+} from './vendor/ansi-styles/index.js';
+import {ColorInfo, ColorSupportLevel} from './vendor/supports-color/index.js';
+
+export interface Options {
+	/**
+	Specify the color support for Chalk.
+
+	By default, color support is automatically detected based on the environment.
+
+	Levels:
+	- `0` - All colors disabled.
+	- `1` - Basic 16 colors support.
+	- `2` - ANSI 256 colors support.
+	- `3` - Truecolor 16 million colors support.
+
+	Omit this option, or pass `undefined`, to have the level detected instead.
+
+	@throws If the value is neither `undefined` nor an integer from 0 to 3.
+	*/
+	readonly level?: ColorSupportLevel | undefined;
+}
+
+/**
+Return a new Chalk instance.
+*/
+export const Chalk: new (options?: Options) => ChalkInstance; // eslint-disable-line @typescript-eslint/naming-convention
+
+/**
+A semantic style chain: a dot-delimited string of static style names (for example `'red.bold'`), or an array of static style names (for example `['red', 'bold']`).
+
+Only static styles are allowed. Argument-taking styles such as `rgb`, `hex`, `ansi256` and their `bg`/`underline` variants throw.
+*/
+export type ThemeStyleDefinition = string | readonly string[];
+
+/**
+Map of custom semantic style names to their style chains.
+*/
+export type ThemeDefinitions = Readonly<Record<string, ThemeStyleDefinition>>;
+
+export interface ChalkInstance {
+	(...text: unknown[]): string;
+
+	/**
+	The color support for Chalk.
+
+	By default, color support is automatically detected based on the environment.
+
+	Levels:
+	- `0` - All colors disabled.
+	- `1` - Basic 16 colors support.
+	- `2` - ANSI 256 colors support.
+	- `3` - Truecolor 16 million colors support.
+
+	@throws If the assigned value is not an integer from 0 to 3.
+	*/
+	level: ColorSupportLevel;
+
+	/**
+	Format text as an error message (red + bold).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.error('Something went wrong');
+	```
+	*/
+	readonly error: this;
+
+	/**
+	Format text as a warning message (yellow + bold).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.warn('Careful there');
+	```
+	*/
+	readonly warn: this;
+
+	/**
+	Format text as an informational message (blue).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.info('Update available');
+	```
+	*/
+	readonly info: this;
+
+	/**
+	Format text as a success message (green).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.success('All tests passed');
+	```
+	*/
+	readonly success: this;
+
+	/**
+	Define one or more custom semantic styles that become directly available on the Chalk instance (for example `chalk.defineTheme({highlight: 'magenta.bold'})` makes `chalk.highlight('...')` callable). All registered styles are available on every Chalk instance, including `chalkStderr` and newly created instances.
+
+	@param definitions - Map of custom style names to style chains. Only static styles are allowed; argument-taking styles such as `rgb`, `hex`, and `ansi256` throw.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.defineTheme({highlight: 'magenta.bold'});
+
+	chalk.highlight('Highlighted text');
+	```
+
+	@throws If a style name collides with a built-in property or is already defined, or if a chain contains an unknown or non-static style.
+	*/
+	defineTheme: (definitions: ThemeDefinitions) => this;
+
+	/**
+	Use RGB values to set text color.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.rgb(222, 173, 237);
+	```
+	*/
+	rgb: (red: number, green: number, blue: number) => this;
+
+	/**
+	Use HEX value to set text color.
+
+	@param color - Hexadecimal value representing the desired color.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.hex('#DEADED');
+	```
+	*/
+	hex: (color: string) => this;
+
+	/**
+	Use an [8-bit unsigned number](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) to set text color.
+
+	The value is downsampled to the 16-color palette on terminals that only support basic colors (level 1), so `chalk.ansi256(196)` becomes 91 (ANSI escape for bright red).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.ansi256(201);
+	```
+	*/
+	ansi256: (index: number) => this;
+
+	/**
+	Use RGB values to set background color.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.bgRgb(222, 173, 237);
+	```
+	*/
+	bgRgb: (red: number, green: number, blue: number) => this;
+
+	/**
+	Use HEX value to set background color.
+
+	@param color - Hexadecimal value representing the desired color.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.bgHex('#DEADED');
+	```
+	*/
+	bgHex: (color: string) => this;
+
+	/**
+	Use an [8-bit unsigned number](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) to set background color.
+
+	The value is downsampled to the 16-color palette on terminals that only support basic colors (level 1), so `chalk.bgAnsi256(196)` becomes 101 (ANSI escape for bright red background).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.bgAnsi256(201);
+	```
+	*/
+	bgAnsi256: (index: number) => this;
+
+	/**
+	Use RGB values to set underline color.
+
+	The underline color is only visible when an underline style is also applied.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.underlineRgb(222, 173, 237).underlineCurly('Hello, world!');
+	```
+	*/
+	underlineRgb: (red: number, green: number, blue: number) => this;
+
+	/**
+	Use HEX value to set underline color.
+
+	The underline color is only visible when an underline style is also applied.
+
+	@param color - Hexadecimal value representing the desired color.
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.underlineHex('#DEADED').underlineCurly('Hello, world!');
+	```
+	*/
+	underlineHex: (color: string) => this;
+
+	/**
+	Use an [8-bit unsigned number](https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit) to set underline color.
+
+	The underline color is only visible when an underline style is also applied.
+
+	The value is downsampled to the first 16 palette entries on terminals that only support basic colors (level 1), so `chalk.underlineAnsi256(196)` becomes 9 (the palette index for bright red).
+
+	@example
+	```
+	import chalk from 'chalk';
+
+	chalk.underlineAnsi256(201).underlineCurly('Hello, world!');
+	```
+	*/
+	underlineAnsi256: (index: number) => this;
+
+	/**
+	Modifier: Reset the current style.
+	*/
+	readonly reset: this;
+
+	/**
+	Modifier: Make the text bold.
+	*/
+	readonly bold: this;
+
+	/**
+	Modifier: Make the text have lower opacity.
+	*/
+	readonly dim: this;
+
+	/**
+	Modifier: Make the text italic. *(Not widely supported)*
+	*/
+	readonly italic: this;
+
+	/**
+	Modifier: Put a horizontal line below the text. *(Not widely supported)*
+	*/
+	readonly underline: this;
+
+	/**
+	Modifier: Put a double horizontal line below the text. *(Not widely supported)*
+	*/
+	readonly underlineDouble: this;
+
+	/**
+	Modifier: Put a curly horizontal line below the text. *(Not widely supported)*
+	*/
+	readonly underlineCurly: this;
+
+	/**
+	Modifier: Put a dotted horizontal line below the text. *(Not widely supported)*
+	*/
+	readonly underlineDotted: this;
+
+	/**
+	Modifier: Put a dashed horizontal line below the text. *(Not widely supported)*
+	*/
+	readonly underlineDashed: this;
+
+	/**
+	Modifier: Put a horizontal line above the text. *(Not widely supported)*
+	*/
+	readonly overline: this;
+
+	/**
+	Modifier: Invert background and foreground colors.
+	*/
+	readonly inverse: this;
+
+	/**
+	Modifier: Print the text but make it invisible.
+	*/
+	readonly hidden: this;
+
+	/**
+	Modifier: Puts a horizontal line through the center of the text. *(Not widely supported)*
+	*/
+	readonly strikethrough: this;
+
+	/**
+	Modifier: Print the text only when Chalk has a color level above zero.
+
+	Can be useful for things that are purely cosmetic.
+	*/
+	readonly visible: this;
+
+	readonly black: this;
+	readonly red: this;
+	readonly green: this;
+	readonly yellow: this;
+	readonly blue: this;
+	readonly magenta: this;
+	readonly cyan: this;
+	readonly white: this;
+
+	/**
+	Alias for `blackBright`.
+	*/
+	readonly gray: this;
+
+	/**
+	Alias for `blackBright`.
+	*/
+	readonly grey: this;
+
+	readonly blackBright: this;
+	readonly redBright: this;
+	readonly greenBright: this;
+	readonly yellowBright: this;
+	readonly blueBright: this;
+	readonly magentaBright: this;
+	readonly cyanBright: this;
+	readonly whiteBright: this;
+
+	readonly bgBlack: this;
+	readonly bgRed: this;
+	readonly bgGreen: this;
+	readonly bgYellow: this;
+	readonly bgBlue: this;
+	readonly bgMagenta: this;
+	readonly bgCyan: this;
+	readonly bgWhite: this;
+
+	/**
+	Alias for `bgBlackBright`.
+	*/
+	readonly bgGray: this;
+
+	/**
+	Alias for `bgBlackBright`.
+	*/
+	readonly bgGrey: this;
+
+	readonly bgBlackBright: this;
+	readonly bgRedBright: this;
+	readonly bgGreenBright: this;
+	readonly bgYellowBright: this;
+	readonly bgBlueBright: this;
+	readonly bgMagentaBright: this;
+	readonly bgCyanBright: this;
+	readonly bgWhiteBright: this;
+
+	readonly underlineBlack: this;
+	readonly underlineRed: this;
+	readonly underlineGreen: this;
+	readonly underlineYellow: this;
+	readonly underlineBlue: this;
+	readonly underlineMagenta: this;
+	readonly underlineCyan: this;
+	readonly underlineWhite: this;
+
+	/**
+	Alias for `underlineBlackBright`.
+	*/
+	readonly underlineGray: this;
+
+	/**
+	Alias for `underlineBlackBright`.
+	*/
+	readonly underlineGrey: this;
+
+	readonly underlineBlackBright: this;
+	readonly underlineRedBright: this;
+	readonly underlineGreenBright: this;
+	readonly underlineYellowBright: this;
+	readonly underlineBlueBright: this;
+	readonly underlineMagentaBright: this;
+	readonly underlineCyanBright: this;
+	readonly underlineWhiteBright: this;
+}
+
+/**
+Main Chalk object that allows to chain styles together.
+
+Call the last one as a method with a string argument.
+
+Order doesn't matter, and later styles take precedent in case of a conflict.
+
+This simply means that `chalk.red.yellow.green` is equivalent to `chalk.green`.
+*/
+declare const chalk: ChalkInstance;
+
+export const supportsColor: ColorInfo;
+
+export const chalkStderr: typeof chalk;
+export const supportsColorStderr: typeof supportsColor;
+
+export {
+	ModifierName,
+	ForegroundColorName,
+	BackgroundColorName,
+	UnderlineColorName,
+	ColorName,
+	modifierNames,
+	foregroundColorNames,
+	backgroundColorNames,
+	underlineColorNames,
+	colorNames,
+// } from '#ansi-styles';
+} from './vendor/ansi-styles/index.js';
+
+export {
+	ColorInfo,
+	ColorSupport,
+	ColorSupportLevel,
+// } from '#supports-color';
+} from './vendor/supports-color/index.js';
+
+// TODO: Remove these aliases in the next major version
+/**
+@deprecated Use `ModifierName` instead.
+
+Basic modifier names.
+*/
+export type Modifiers = ModifierName;
+
+/**
+@deprecated Use `ForegroundColorName` instead.
+
+Basic foreground color names.
+
+[More colors here.](https://github.com/chalk/chalk/blob/main/readme.md#256-and-truecolor-color-support)
+*/
+export type ForegroundColor = ForegroundColorName;
+
+/**
+@deprecated Use `BackgroundColorName` instead.
+
+Basic background color names.
+
+[More colors here.](https://github.com/chalk/chalk/blob/main/readme.md#256-and-truecolor-color-support)
+*/
+export type BackgroundColor = BackgroundColorName;
+
+/**
+@deprecated Use `ColorName` instead.
+
+Basic color names. The combination of foreground and background color names.
+
+[More colors here.](https://github.com/chalk/chalk/blob/main/readme.md#256-and-truecolor-color-support)
+*/
+export type Color = ColorName;
+
+/**
+@deprecated Use `modifierNames` instead.
+
+Basic modifier names.
+*/
+export const modifiers: readonly ModifierName[];
+
+/**
+@deprecated Use `foregroundColorNames` instead.
+
+Basic foreground color names.
+*/
+export const foregroundColors: readonly ForegroundColorName[];
+
+/**
+@deprecated Use `backgroundColorNames` instead.
+
+Basic background color names.
+*/
+export const backgroundColors: readonly BackgroundColorName[];
+
+/**
+@deprecated Use `colorNames` instead.
+
+Basic color names. The combination of foreground and background color names.
+*/
+export const colors: readonly ColorName[];
+
+export default chalk;
+
+
+
+================================================
+FILE: source/index.js
+================================================
+import {
+	stringReplaceAll,
+	stringEncaseCRLFWithFirstIndex,
+} from './utilities.js';
+import ansiStyles from '#ansi-styles';
+import supportsColor from '#supports-color';
+
+const {stdout: stdoutColor, stderr: stderrColor} = supportsColor;
+
+const GENERATOR = Symbol('GENERATOR');
+const STYLER = Symbol('STYLER');
+const IS_EMPTY = Symbol('IS_EMPTY');
+const LEVEL = Symbol('LEVEL');
+
+const styles = Object.create(null);
+
+const assertValidLevel = level => {
+	if (!Number.isSafeInteger(level) || level < 0 || level > 3) {
+		throw new Error('The `level` should be an integer from 0 to 3');
+	}
+};
+
+// The level is stored under a symbol so the hot path can read it as a plain property, while `level` itself is an accessor that rejects values the rest of the code could not handle.
+const levelDescriptor = {
+	enumerable: true,
+	get() {
+		return this[LEVEL];
+	},
+	set(level) {
+		assertValidLevel(level);
+		this[LEVEL] = level;
+	},
+};
+
+const applyOptions = (object, options = {}) => {
+	if (options.level !== undefined) {
+		assertValidLevel(options.level);
+	}
+
+	// Detect level if not set manually. Written under the symbol rather than through `level`, as the prototype carrying that accessor is not installed until after this runs.
+	const colorLevel = stdoutColor ? stdoutColor.level : 0;
+	object[LEVEL] = options.level === undefined ? colorLevel : options.level;
+};
+
+export class Chalk {
+	constructor(options) {
+		// eslint-disable-next-line no-constructor-return
+		return chalkFactory(options);
+	}
+}
+
+const chalkFactory = (options, chalkProto = createChalk.prototype) => {
+	const chalk = (...strings) => strings.join(' ');
+	applyOptions(chalk, options);
+
+	Object.setPrototypeOf(chalk, chalkProto);
+
+	return chalk;
+};
+
+function createChalk(options) {
+	return chalkFactory(options);
+}
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The prototype chain must be set up at module load.
+Object.setPrototypeOf(createChalk.prototype, Function.prototype);
+
+for (const [styleName, style] of Object.entries(ansiStyles)) {
+	styles[styleName] = {
+		get() {
+			const builder = createBuilder(this, createStyler(style.open, style.close, this[STYLER]), this[IS_EMPTY]);
+			Object.defineProperty(this, styleName, {value: builder});
+			return builder;
+		},
+	};
+}
+
+styles.visible = {
+	get() {
+		const builder = createBuilder(this, this[STYLER], true);
+		Object.defineProperty(this, 'visible', {value: builder});
+		return builder;
+	},
+};
+
+// Resolve a color model to one converter per `level`, so that a call only has to look up the converter for the current level instead of re-deciding the model and level every time.
+const createModelConverters = (model, type) => {
+	const style = ansiStyles[type];
+
+	if (model === 'rgb') {
+		const ansi = (red, green, blue) => style.ansi(ansiStyles.rgbToAnsi(red, green, blue));
+		const ansi256 = (red, green, blue) => style.ansi256(ansiStyles.rgbToAnsi256(red, green, blue));
+		return [ansi, ansi, ansi256, style.ansi16m];
+	}
+
+	if (model === 'hex') {
+		const ansi = hex => style.ansi(ansiStyles.hexToAnsi(hex));
+		const ansi256 = hex => style.ansi256(ansiStyles.hexToAnsi256(hex));
+		return [ansi, ansi, ansi256, hex => style.ansi16m(...ansiStyles.hexToRgb(hex))];
+	}
+
+	// `ansi256` is already the native form, so only the 16-color levels need converting.
+	const ansi = code => style.ansi(ansiStyles.ansi256ToAnsi(code));
+	return [ansi, ansi, style.ansi256, style.ansi256];
+};
+
+const usedModels = ['rgb', 'hex', 'ansi256'];
+
+for (const model of usedModels) {
+	const capitalizedModel = model[0].toUpperCase() + model.slice(1);
+
+	for (const [styleName, type] of [
+		[model, 'color'],
+		['bg' + capitalizedModel, 'bgColor'],
+		['underline' + capitalizedModel, 'underlineColor'],
+	]) {
+		const {close} = ansiStyles[type];
+		const converters = createModelConverters(model, type);
+
+		styles[styleName] = {
+			get() {
+				// The level is read on call rather than captured here so the function can be cached on the instance instead of being reallocated on every property access.
+				// `rgb` is the widest model, so naming the three parameters avoids a rest array.
+				const styleFunction = function (first, second, third) {
+					const open = converters[this.level](first, second, third);
+					return createBuilder(this, createStyler(open, close, this[STYLER]), this[IS_EMPTY]);
+				};
+
+				Object.defineProperty(this, styleName, {value: styleFunction});
+				return styleFunction;
+			},
+		};
+	}
+}
+
+const proto = Object.defineProperties(
+	() => {},
+	{
+		...styles,
+		level: {
+			enumerable: true,
+			get() {
+				return this[GENERATOR].level;
+			},
+			set(level) {
+				this[GENERATOR].level = level;
+			},
+		},
+	},
+);
+
+const createStyler = (open, close, parent) => {
+	let openAll;
+	let closeAll;
+	if (parent === undefined) {
+		openAll = open;
+		closeAll = close;
+	} else {
+		openAll = parent.openAll + open;
+		closeAll = close + parent.closeAll;
+	}
+
+	return {
+		open,
+		close,
+		openAll,
+		closeAll,
+		parent,
+	};
+};
+
+const createBuilder = (self, _styler, _isEmpty) => {
+	// Single argument is hot path, implicit coercion is faster than anything
+	const builder = (...arguments_) => {
+		if (arguments_.length === 1) {
+			// eslint-disable-next-line no-implicit-coercion
+			return applyStyle(builder, '' + arguments_[0]);
+		}
+
+		if (arguments_.length === 2) {
+			return applyStyle(builder, arguments_[0] + ' ' + arguments_[1]);
+		}
+
+		return applyStyle(builder, arguments_.join(' '));
+	};
+
+	// We alter the prototype because we must return a function, but there is
+	// no way to create a function with a different prototype
+	Object.setPrototypeOf(builder, proto);
+
+	// Point every builder at the root generator instead of its immediate parent, so reading the level costs one property load rather than walking a `level` getter per link of the chain.
+	builder[GENERATOR] = self[GENERATOR] ?? self;
+	builder[STYLER] = _styler;
+	builder[IS_EMPTY] = _isEmpty;
+
+	return builder;
+};
+
+const applyStyle = (self, string) => {
+	// Read the level directly off the generator to skip the `level` getter dispatch on this hot path
+	if (self[GENERATOR][LEVEL] <= 0 || !string) {
+		// eslint-disable-next-line unicorn/no-computed-property-existence-check -- Reads the boolean value, not a property existence check.
+		return self[IS_EMPTY] ? '' : string;
+	}
+
+	let styler = self[STYLER];
+
+	if (styler === undefined) {
+		return string;
+	}
+
+	const {openAll, closeAll} = styler;
+	if (string.includes('\u{1B}')) {
+		while (styler !== undefined) {
+			// Replace any instances already present with a re-opening code
+			// otherwise only the part of the string until said closing code
+			// will be colored, and the rest will simply be 'plain'.
+			string = stringReplaceAll(string, styler.close, styler.open);
+
+			styler = styler.parent;
+		}
+	}
+
+	// We can move both next actions out of loop, because remaining actions in loop won't have
+	// any/visible effect on parts we add here. Close the styling before a linebreak and reopen
+	// after next line to fix a bleed issue on macOS: https://github.com/chalk/chalk/pull/92
+	const lfIndex = string.indexOf('\n');
+	if (lfIndex !== -1) {
+		string = stringEncaseCRLFWithFirstIndex(string, closeAll, openAll, lfIndex);
+	}
+
+	return openAll + string + closeAll;
+};
+
+// `level` lives on the prototype rather than on each instance, so it costs nothing to construct an instance and matches how builders already expose it. It is inherited rather than own, so it does not show up in `Object.keys()`, same as for a builder.
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The style getters must be installed at module load.
+Object.defineProperties(createChalk.prototype, {...styles, level: levelDescriptor});
+
+// === THEME SYSTEM ===
+//
+// A theme is a named, reusable style chain that produces a builder rooted at the
+// instance that requested it, so `chalk.level = 0` immediately propagates to all
+// theme-derived builders. Themes support both registration via `chalk.theme({...})`
+// and direct access via `chalk.theme.<name>(...)`. Style names that take arguments
+// at call time (e.g. `rgb`, `hex`, `ansi256`) are forbidden inside theme chains
+// because their getter returns a function rather than a builder.
+
+const RESERVED_THEME_NAMES = new Set(['level', 'theme']);
+
+const DEFAULT_THEMES = {
+	error: 'red.bold',
+	warn: 'yellow.bold',
+	info: 'blue',
+	success: 'green',
+};
+
+// Build the set of style names whose getter returns a function taking call-site
+// arguments (`rgb`, `bgHex`, `underlineAnsi256`, â€¦). These cannot appear inside a
+// theme chain because they don't compose through the normal builder path.
+const DYNAMIC_STYLE_NAMES = new Set();
+for (const model of usedModels) {
+	const capitalizedModel = model[0].toUpperCase() + model.slice(1);
+	DYNAMIC_STYLE_NAMES.add(model);
+	DYNAMIC_STYLE_NAMES.add('bg' + capitalizedModel);
+	DYNAMIC_STYLE_NAMES.add('underline' + capitalizedModel);
+}
+
+const isStaticStyle = name =>
+	Object.hasOwn(styles, name)
+	&& !DYNAMIC_STYLE_NAMES.has(name);
+
+const isThemeDefinition = value =>
+	value !== null
+	&& typeof value === 'object'
+	&& !Array.isArray(value);
+
+const parseThemeChain = definition => {
+	if (typeof definition === 'string') {
+		return definition.split('.');
+	}
+
+	if (Array.isArray(definition)) {
+		return [...definition];
+	}
+
+	throw new TypeError('Theme style definition must be a string or an array of strings');
+};
+
+const validateThemeChain = chain => {
+	if (chain.length === 0) {
+		throw new Error('Theme style chain cannot be empty');
+	}
+
+	for (const part of chain) {
+		if (typeof part !== 'string' || part.length === 0) {
+			throw new Error('Each style name in a theme chain must be a non-empty string');
+		}
+
+		if (!isStaticStyle(part)) {
+			throw new Error(`Unknown or non-static style "${part}" in theme definition. Only static styles are allowed.`);
+		}
+	}
+
+	return chain;
+};
+
+const assertValidThemeName = name => {
+	if (typeof name !== 'string' || name.length === 0) {
+		throw new TypeError('Theme name must be a non-empty string');
+	}
+
+	if (RESERVED_THEME_NAMES.has(name)) {
+		throw new Error(`Theme name "${name}" is reserved`);
+	}
+};
+
+const defineThemeGetter = (targetProto, name, chain, chalkRoot) => {
+	Object.defineProperty(targetProto, name, {
+		enumerable: true,
+		configurable: true,
+		get() {
+			let builder = chalkRoot;
+			for (const styleName of chain) {
+				builder = builder[styleName];
+			}
+
+			Object.defineProperty(this, name, {value: builder, configurable: true, enumerable: true});
+			return builder;
+		},
+	});
+};
+
+const THEME_CACHE = Symbol('THEME_CACHE');
+
+const createThemeFor = chalkRoot => {
+	const themeProto = Object.create(createChalk.prototype);
+
+	for (const [name, definition] of Object.entries(DEFAULT_THEMES)) {
+		assertValidThemeName(name);
+		if (Object.hasOwn(themeProto, name)) {
+			throw new Error(`Theme "${name}" is already defined`);
+		}
+
+		const chain = validateThemeChain(parseThemeChain(definition));
+		defineThemeGetter(themeProto, name, chain, chalkRoot);
+	}
+
+	const themeInstance = chalkFactory({}, themeProto);
+
+	const themeFunction = function (...args) {
+		if (args.length === 1 && isThemeDefinition(args[0])) {
+			const definitions = args[0];
+
+			for (const [name, definition] of Object.entries(definitions)) {
+				assertValidThemeName(name);
+				if (Object.hasOwn(themeProto, name)) {
+					throw new Error(`Theme "${name}" is already defined`);
+				}
+
+				const chain = validateThemeChain(parseThemeChain(definition));
+				defineThemeGetter(themeProto, name, chain, chalkRoot);
+			}
+
+			return themeFunction;
+		}
+
+		return Reflect.apply(themeInstance, this, args);
+	};
+
+	Object.setPrototypeOf(themeFunction, themeInstance);
+	return themeFunction;
+};
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The legacy `theme` namespace must be installed on the shared prototype at module load.
+Object.defineProperty(createChalk.prototype, 'theme', {
+	configurable: true,
+	enumerable: false,
+	get() {
+		const cached = this[THEME_CACHE];
+		if (cached !== undefined) {
+			return cached;
+		}
+
+		const theme = createThemeFor(this);
+		this[THEME_CACHE] = theme;
+		return theme;
+	},
+});
+
+// === SEMANTIC STYLES ===
+//
+// Semantic styles (`error`, `warn`, `info`, `success`) and any custom style
+// registered through `chalk.defineTheme({...})` are installed as lazy getters
+// on the shared `createChalk.prototype`, so they are available on the default
+// `chalk` instance, `chalkStderr`, and every `new Chalk()` instance.
+//
+// A getter walks its style chain through the normal builder system on first
+// access and caches the resulting builder on the requesting instance, so no
+// ANSI code string is ever cached: setting `chalk.level = 0` in the middle of
+// a program makes every semantic style output plain text immediately, just
+// like any other chalk style.
+
+const DEFAULT_SEMANTIC_STYLES = {
+	error: ['red', 'bold'],
+	warn: ['yellow', 'bold'],
+	info: ['blue'],
+	success: ['green'],
+};
+
+// Names that exist on every instance (or the shared prototype) and therefore
+// can never be used as a semantic style name.
+const SEMANTIC_STYLE_BASE_NAMES = new Set([
+	'level',
+	'enabled',
+	'constructor',
+	'theme',
+	'defineTheme',
+	'__proto__',
+]);
+
+// Names already taken by a custom style registered through `defineTheme`.
+const REGISTERED_SEMANTIC_STYLES = new Set();
+
+const assertValidSemanticStyleName = name => {
+	if (typeof name !== 'string' || name.length === 0) {
+		throw new TypeError('Style name must be a non-empty string');
+	}
+
+	if (
+		SEMANTIC_STYLE_BASE_NAMES.has(name)
+		|| Object.hasOwn(styles, name)
+		|| Object.hasOwn(DEFAULT_SEMANTIC_STYLES, name)
+	) {
+		throw new Error(`Theme style name "${name}" collides with a built-in property`);
+	}
+
+	if (REGISTERED_SEMANTIC_STYLES.has(name)) {
+		throw new Error(`Theme style name "${name}" is already defined`);
+	}
+};
+
+const defineSemanticStyleGetter = (name, chain) => {
+	Object.defineProperty(createChalk.prototype, name, {
+		configurable: true,
+		enumerable: false,
+		get() {
+			const [firstStyle, ...restStyles] = chain;
+			let builder = this[firstStyle];
+			for (const styleName of restStyles) {
+				builder = builder[styleName];
+			}
+
+			// Cache the resolved builder on the requesting instance. The builder is
+			// rooted at that instance, so the level is still read live at call time
+			// and `chalk.level = 0` keeps working after the first access.
+			Object.defineProperty(this, name, {value: builder, configurable: true});
+			return builder;
+		},
+	});
+
+	REGISTERED_SEMANTIC_STYLES.add(name);
+};
+
+for (const [name, definition] of Object.entries(DEFAULT_SEMANTIC_STYLES)) {
+	defineSemanticStyleGetter(name, validateThemeChain(parseThemeChain(definition)));
+}
+
+// eslint-disable-next-line unicorn/no-top-level-side-effects -- The `defineTheme` method must be installed on the shared prototype at module load.
+Object.defineProperty(createChalk.prototype, 'defineTheme', {
+	configurable: true,
+	enumerable: false,
+	value(definitions) {
+		if (!isThemeDefinition(definitions)) {
+			throw new TypeError('Theme definitions must be an object of style names to style chains');
+		}
+
+		// Validate every entry first, so a bad definition cannot partially register the good ones.
+		const registrations = Object.entries(definitions).map(([name, definition]) => {
+			assertValidSemanticStyleName(name);
+			return [name, validateThemeChain(parseThemeChain(definition))];
+		});
+
+		for (const [name, chain] of registrations) {
+			defineSemanticStyleGetter(name, chain);
+		}
+
+		return this;
+	},
+});
+
+const chalk = createChalk();
+export const chalkStderr = createChalk({level: stderrColor ? stderrColor.level : 0});
+
+export {
+	modifierNames,
+	foregroundColorNames,
+	backgroundColorNames,
+	underlineColorNames,
+	colorNames,
+
+	// TODO: Remove these aliases in the next major version
+	modifierNames as modifiers,
+	foregroundColorNames as foregroundColors,
+	backgroundColorNames as backgroundColors,
+	colorNames as colors,
+} from './vendor/ansi-styles/index.js';
+
+export {
+	stdoutColor as supportsColor,
+	stderrColor as supportsColorStderr,
+};
+
+export default chalk;
+
+
+
+================================================
+FILE: source/utilities.js
+================================================
+// Note: Each match is kept and `postfix` is inserted after it. `String#replaceAll(substring, substring + postfix)` does the same, but it has to scan the replacement for `$` patterns and it is several times slower on the no-match path that most calls take.
+export function stringReplaceAll(string, substring, postfix) {
+	let index = string.indexOf(substring);
+	if (index === -1) {
+		return string;
+	}
+
+	const substringLength = substring.length;
+	let endIndex = 0;
+	let returnValue = '';
+	do {
+		returnValue += string.slice(endIndex, index) + substring + postfix;
+		endIndex = index + substringLength;
+		index = string.indexOf(substring, endIndex);
+	} while (index !== -1);
+
+	returnValue += string.slice(endIndex);
+	return returnValue;
+}
+
+export function stringEncaseCRLFWithFirstIndex(string, prefix, postfix, index) {
+	let endIndex = 0;
+	let returnValue = '';
+	do {
+		const isGotCR = string[index - 1] === '\r';
+		returnValue += string.slice(endIndex, (isGotCR ? index - 1 : index)) + prefix + (isGotCR ? '\r\n' : '\n') + postfix;
+		endIndex = index + 1;
+		index = string.indexOf('\n', endIndex);
+	} while (index !== -1);
+
+	returnValue += string.slice(endIndex);
+	return returnValue;
+}
+
+
+
+================================================
+FILE: test/_fixture.js
+================================================
+import chalk, {chalkStderr} from '../source/index.js';
+
+console.log(`${chalk.hex('#ff6159')('testout')} ${chalkStderr.hex('#ff6159')('testerr')}`);
+
+
+
+================================================
+FILE: test/_force-color-fixture.js
+================================================
+import {supportsColor} from '../source/index.js';
+
+// A string, as `console.log` colorizes numbers when the environment forces color.
+console.log(String(supportsColor ? supportsColor.level : 0));
+
+
+
+================================================
+FILE: test/chalk.js
+================================================
+import process from 'node:process';
+import test from 'ava';
+import chalk, {
+	Chalk,
+	chalkStderr,
+	colorNames,
+	modifierNames,
+	underlineColorNames,
+} from '../source/index.js';
+
+chalk.level = 3;
+chalkStderr.level = 3;
+
+console.log('TERM:', process.env.TERM || '[none]');
+console.log('platform:', process.platform || '[unknown]');
+
+test('don\'t add any styling when called as the base function', t => {
+	t.is(chalk('foo'), 'foo');
+});
+
+test('support multiple arguments in base function', t => {
+	t.is(chalk('hello', 'there'), 'hello there');
+});
+
+test('support automatic casting to string', t => {
+	t.is(chalk(['hello', 'there']), 'hello,there');
+	t.is(chalk(123), '123');
+
+	t.is(chalk.bold(['foo', 'bar']), '\u{1B}[1mfoo,bar\u{1B}[22m');
+	t.is(chalk.green(98_765), '\u{1B}[32m98765\u{1B}[39m');
+});
+
+test('style string', t => {
+	t.is(chalk.underline('foo'), '\u{1B}[4mfoo\u{1B}[24m');
+	t.is(chalk.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(chalk.bgRed('foo'), '\u{1B}[41mfoo\u{1B}[49m');
+});
+
+test('support applying multiple styles at once', t => {
+	t.is(chalk.red.bgGreen.underline('foo'), '\u{1B}[31m\u{1B}[42m\u{1B}[4mfoo\u{1B}[24m\u{1B}[49m\u{1B}[39m');
+	t.is(chalk.underline.red.bgGreen('foo'), '\u{1B}[4m\u{1B}[31m\u{1B}[42mfoo\u{1B}[49m\u{1B}[39m\u{1B}[24m');
+});
+
+test('support nesting styles', t => {
+	t.is(
+		chalk.red('foo' + chalk.underline.bgBlue('bar') + '!'),
+		'\u{1B}[31mfoo\u{1B}[4m\u{1B}[44mbar\u{1B}[49m\u{1B}[24m!\u{1B}[39m',
+	);
+});
+
+test('support nesting styles of the same type (color, underline, bg)', t => {
+	const nested = chalk.yellow('b' + chalk.green('c') + 'b');
+	t.is(
+		chalk.red('a' + nested + 'c'),
+		'\u{1B}[31ma\u{1B}[33mb\u{1B}[32mc\u{1B}[39m\u{1B}[31m\u{1B}[33mb\u{1B}[39m\u{1B}[31mc\u{1B}[39m',
+	);
+});
+
+test('reset all styles with `.reset()`', t => {
+	t.is(chalk.reset(chalk.red.bgGreen.underline('foo') + 'foo'), '\u{1B}[0m\u{1B}[31m\u{1B}[42m\u{1B}[4mfoo\u{1B}[24m\u{1B}[49m\u{1B}[39mfoo\u{1B}[0m');
+});
+
+test('support caching multiple styles', t => {
+	const {red, green} = chalk.red;
+	const redBold = red.bold;
+	const greenBold = green.bold;
+
+	t.not(red('foo'), green('foo'));
+	t.not(redBold('bar'), greenBold('bar'));
+	t.not(green('baz'), greenBold('baz'));
+});
+
+test('alias gray to grey', t => {
+	t.is(chalk.grey('foo'), '\u{1B}[90mfoo\u{1B}[39m');
+});
+
+test('support variable number of arguments', t => {
+	t.is(chalk.red('foo', 'bar'), '\u{1B}[31mfoo bar\u{1B}[39m');
+});
+
+test('support falsy values', t => {
+	t.is(chalk.red(0), '\u{1B}[31m0\u{1B}[39m');
+});
+
+test('don\'t output escape codes if the input is empty', t => {
+	t.is(chalk.red(), '');
+	t.is(chalk.red.blue.black(), '');
+});
+
+test('keep Function.prototype methods', t => {
+	t.is(Reflect.apply(chalk.grey, null, ['foo']), '\u{1B}[90mfoo\u{1B}[39m');
+	t.is(chalk.reset(chalk.red.bgGreen.underline.bind(null)('foo') + 'foo'), '\u{1B}[0m\u{1B}[31m\u{1B}[42m\u{1B}[4mfoo\u{1B}[24m\u{1B}[49m\u{1B}[39mfoo\u{1B}[0m');
+	t.is(chalk.red.blue.black.call(null), '');
+});
+
+test('line breaks should open and close colors', t => {
+	t.is(chalk.grey('hello\nworld'), '\u{1B}[90mhello\u{1B}[39m\n\u{1B}[90mworld\u{1B}[39m');
+});
+
+test('line breaks should open and close colors with CRLF', t => {
+	t.is(chalk.grey('hello\r\nworld'), '\u{1B}[90mhello\u{1B}[39m\r\n\u{1B}[90mworld\u{1B}[39m');
+});
+
+test('properly convert RGB to 16 colors on basic color terminals', t => {
+	t.is(new Chalk({level: 1}).rgb(255, 0, 0)('hello'), '\u{1B}[91mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).bgRgb(255, 0, 0)('hello'), '\u{1B}[101mhello\u{1B}[49m');
+	t.is(new Chalk({level: 1}).hex('#FF0000')('hello'), '\u{1B}[91mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).bgHex('#FF0000')('hello'), '\u{1B}[101mhello\u{1B}[49m');
+});
+
+test('properly convert RGB to 256 colors on basic color terminals', t => {
+	t.is(new Chalk({level: 2}).rgb(255, 0, 0)('hello'), '\u{1B}[38;5;196mhello\u{1B}[39m');
+	t.is(new Chalk({level: 2}).bgRgb(255, 0, 0)('hello'), '\u{1B}[48;5;196mhello\u{1B}[49m');
+	t.is(new Chalk({level: 3}).rgb(255, 0, 0)('hello'), '\u{1B}[38;2;255;0;0mhello\u{1B}[39m');
+	t.is(new Chalk({level: 3}).bgRgb(255, 0, 0)('hello'), '\u{1B}[48;2;255;0;0mhello\u{1B}[49m');
+	t.is(new Chalk({level: 2}).hex('#FF0000')('hello'), '\u{1B}[38;5;196mhello\u{1B}[39m');
+	t.is(new Chalk({level: 2}).bgHex('#FF0000')('hello'), '\u{1B}[48;5;196mhello\u{1B}[49m');
+	t.is(new Chalk({level: 3}).bgHex('#FF0000')('hello'), '\u{1B}[48;2;255;0;0mhello\u{1B}[49m');
+});
+
+test('properly convert ANSI 256 to 16 colors on basic color terminals', t => {
+	t.is(new Chalk({level: 1}).ansi256(196)('hello'), '\u{1B}[91mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).bgAnsi256(196)('hello'), '\u{1B}[101mhello\u{1B}[49m');
+	t.is(new Chalk({level: 1}).ansi256(2)('hello'), '\u{1B}[32mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).bgAnsi256(2)('hello'), '\u{1B}[42mhello\u{1B}[49m');
+	t.is(new Chalk({level: 1}).ansi256(8)('hello'), '\u{1B}[90mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).ansi256(232)('hello'), '\u{1B}[30mhello\u{1B}[39m');
+	t.is(new Chalk({level: 1}).ansi256(255)('hello'), '\u{1B}[37mhello\u{1B}[39m');
+});
+
+test('keep ANSI 256 colors on 256 color and Truecolor terminals', t => {
+	t.is(new Chalk({level: 2}).ansi256(196)('hello'), '\u{1B}[38;5;196mhello\u{1B}[39m');
+	t.is(new Chalk({level: 2}).bgAnsi256(196)('hello'), '\u{1B}[48;5;196mhello\u{1B}[49m');
+	t.is(new Chalk({level: 3}).ansi256(196)('hello'), '\u{1B}[38;5;196mhello\u{1B}[39m');
+	t.is(new Chalk({level: 3}).bgAnsi256(196)('hello'), '\u{1B}[48;5;196mhello\u{1B}[49m');
+});
+
+test('don\'t emit color codes if level is 0', t => {
+	t.is(new Chalk({level: 0}).hex('#FF0000')('hello'), 'hello');
+	t.is(new Chalk({level: 0}).bgHex('#FF0000')('hello'), 'hello');
+	t.is(new Chalk({level: 0}).ansi256(196)('hello'), 'hello');
+	t.is(new Chalk({level: 0}).bgAnsi256(196)('hello'), 'hello');
+	t.is(new Chalk({level: 0}).underlineHex('#FF0000')('hello'), 'hello');
+	t.is(new Chalk({level: 0}).underlineAnsi256(196)('hello'), 'hello');
+	t.is(new Chalk({level: 0}).underlineRed('hello'), 'hello');
+	t.is(new Chalk({level: 0}).underlineCurly('hello'), 'hello');
+});
+
+test('support extended underline styles', t => {
+	t.is(chalk.underlineDouble('foo'), '\u{1B}[4:2mfoo\u{1B}[24m');
+	t.is(chalk.underlineCurly('foo'), '\u{1B}[4:3mfoo\u{1B}[24m');
+	t.is(chalk.underlineDotted('foo'), '\u{1B}[4:4mfoo\u{1B}[24m');
+	t.is(chalk.underlineDashed('foo'), '\u{1B}[4:5mfoo\u{1B}[24m');
+});
+
+test('support nesting underline styles', t => {
+	t.is(
+		chalk.underline(chalk.underlineCurly('a') + 'b'),
+		'\u{1B}[4m\u{1B}[4:3ma\u{1B}[24m\u{1B}[4mb\u{1B}[24m',
+	);
+
+	t.is(
+		chalk.underlineCurly(chalk.underline('a') + 'b'),
+		'\u{1B}[4:3m\u{1B}[4ma\u{1B}[24m\u{1B}[4:3mb\u{1B}[24m',
+	);
+});
+
+test('support underline colors', t => {
+	t.is(chalk.underlineRed('foo'), '\u{1B}[58;5;1mfoo\u{1B}[59m');
+	t.is(chalk.underlineBlackBright('foo'), '\u{1B}[58;5;8mfoo\u{1B}[59m');
+	t.is(chalk.underlineGray('foo'), chalk.underlineBlackBright('foo'));
+	t.is(chalk.underlineGrey('foo'), chalk.underlineBlackBright('foo'));
+	t.is(
+		chalk.red.underlineRed.underlineCurly('foo'),
+		'\u{1B}[31m\u{1B}[58;5;1m\u{1B}[4:3mfoo\u{1B}[24m\u{1B}[59m\u{1B}[39m',
+	);
+});
+
+test('support nesting underline colors', t => {
+	t.is(
+		chalk.underlineBlue(chalk.underlineRed('a') + 'b'),
+		'\u{1B}[58;5;4m\u{1B}[58;5;1ma\u{1B}[59m\u{1B}[58;5;4mb\u{1B}[59m',
+	);
+});
+
+test('properly downsample underline colors', t => {
+	t.is(new Chalk({level: 3}).underlineRgb(255, 0, 0)('hello'), '\u{1B}[58;2;255;0;0mhello\u{1B}[59m');
+	t.is(new Chalk({level: 2}).underlineRgb(255, 0, 0)('hello'), '\u{1B}[58;5;196mhello\u{1B}[59m');
+	t.is(new Chalk({level: 1}).underlineRgb(255, 0, 0)('hello'), '\u{1B}[58;5;9mhello\u{1B}[59m');
+	t.is(new Chalk({level: 3}).underlineHex('#FF0000')('hello'), '\u{1B}[58;2;255;0;0mhello\u{1B}[59m');
+	t.is(new Chalk({level: 2}).underlineHex('#FF0000')('hello'), '\u{1B}[58;5;196mhello\u{1B}[59m');
+	t.is(new Chalk({level: 1}).underlineHex('#FF0000')('hello'), '\u{1B}[58;5;9mhello\u{1B}[59m');
+	t.is(new Chalk({level: 3}).underlineAnsi256(196)('hello'), '\u{1B}[58;5;196mhello\u{1B}[59m');
+	t.is(new Chalk({level: 2}).underlineAnsi256(196)('hello'), '\u{1B}[58;5;196mhello\u{1B}[59m');
+	t.is(new Chalk({level: 1}).underlineAnsi256(196)('hello'), '\u{1B}[58;5;9mhello\u{1B}[59m');
+	t.is(new Chalk({level: 1}).underlineAnsi256(2)('hello'), '\u{1B}[58;5;2mhello\u{1B}[59m');
+	t.is(new Chalk({level: 1}).underlineAnsi256(232)('hello'), '\u{1B}[58;5;0mhello\u{1B}[59m');
+
+	// The named underline colors have no basic 16-color form, so they are the same at every level.
+	t.is(new Chalk({level: 1}).underlineRed('hello'), '\u{1B}[58;5;1mhello\u{1B}[59m');
+	t.is(new Chalk({level: 2}).underlineRed('hello'), '\u{1B}[58;5;1mhello\u{1B}[59m');
+});
+
+test('expose the underline style names', t => {
+	t.true(modifierNames.includes('underlineCurly'));
+	t.true(underlineColorNames.includes('underlineRedBright'));
+
+	// Underline colors are intentionally not part of `colorNames`.
+	t.false(colorNames.includes('underlineRed'));
+});
+
+test('supports blackBright color', t => {
+	t.is(chalk.blackBright('foo'), '\u{1B}[90mfoo\u{1B}[39m');
+});
+
+test('sets correct level for chalkStderr and respects it', t => {
+	t.is(chalkStderr.level, 3);
+	t.is(chalkStderr.red.bold('foo'), '\u{1B}[31m\u{1B}[1mfoo\u{1B}[22m\u{1B}[39m');
+});
+
+test('keeps function prototype methods', t => {
+	t.is(chalk.apply(chalk, ['foo']), 'foo');
+	t.is(chalk.bind(chalk, 'foo')(), 'foo');
+	t.is(chalk.call(chalk, 'foo'), 'foo');
+});
+
+
+
+================================================
+FILE: test/force-color.js
+================================================
+import process from 'node:process';
+import {fileURLToPath} from 'node:url';
+import test from 'ava';
+import {execaNode} from 'execa';
+
+const fixture = fileURLToPath(new URL('_force-color-fixture.js', import.meta.url));
+
+// The environment is not extended so that the ambient `CI`, `TERM`, and `COLORTERM` of the machine running the tests cannot leak into the fixture.
+const detectLevel = async (environment, flags = []) => {
+	const {stdout} = await execaNode(fixture, flags, {env: environment, extendEnv: false});
+	return stdout;
+};
+
+test('`FORCE_COLOR=1` is an exact level, not a minimum', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '1', COLORTERM: 'truecolor'}), '1');
+});
+
+test('`FORCE_COLOR=2` is an exact level, not a minimum', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '2', COLORTERM: 'truecolor'}), '2');
+});
+
+test('`FORCE_COLOR=3` enables truecolor', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '3'}), '3');
+});
+
+test('`FORCE_COLOR=1` overrides CI detection', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '1', CI: 'true', GITHUB_ACTIONS: 'true'}), '1');
+});
+
+test('`FORCE_COLOR=1` overrides TERM detection', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '1', TERM: 'xterm-256color'}), '1');
+});
+
+test('a `FORCE_COLOR` above 3 is clamped to 3', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '4', TERM: 'xterm-256color'}), '3');
+});
+
+test('the `--color=256` and `--color=16m` flags take precedence over a numeric `FORCE_COLOR`', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '1'}, ['--color=256']), '2');
+	t.is(await detectLevel({FORCE_COLOR: '1'}, ['--color=16m']), '3');
+});
+
+test('`FORCE_COLOR=0` disables color', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '0', COLORTERM: 'truecolor'}), '0');
+});
+
+test('`FORCE_COLOR=true` only enables color and lets the level be detected', async t => {
+	t.is(await detectLevel({FORCE_COLOR: 'true', COLORTERM: 'truecolor'}), '3');
+
+	// On Windows the detected level comes from the OS version (modern Windows supports TrueColor)
+	// rather than from `TERM`/`COLORTERM`, so the detected level differs from POSIX expectations.
+	const osLevel = await detectLevel({FORCE_COLOR: 'true'});
+	const isWin32 = process.platform === 'win32';
+
+	t.is(await detectLevel({FORCE_COLOR: 'true', TERM: 'xterm-256color'}), isWin32 ? osLevel : '2');
+	t.is(osLevel, isWin32 ? osLevel : '1');
+});
+
+test('an empty `FORCE_COLOR` behaves like `FORCE_COLOR=true`', async t => {
+	t.is(await detectLevel({FORCE_COLOR: '', COLORTERM: 'truecolor'}), '3');
+});
+
+test('`FORCE_COLOR=false` disables color', async t => {
+	t.is(await detectLevel({FORCE_COLOR: 'false', COLORTERM: 'truecolor'}), '0');
+});
+
+test('a non-numeric `FORCE_COLOR` is treated as unset, not as disabled', async t => {
+	t.is(await detectLevel({FORCE_COLOR: 'unicorn', COLORTERM: 'truecolor'}), '0');
+
+	// The fixture is piped, so unset and disabled both give 0. The Azure check sits above the non-TTY check, so it tells the two apart.
+	t.is(await detectLevel({FORCE_COLOR: 'unicorn', TF_BUILD: '1', AGENT_NAME: 'agent'}), '1');
+	t.is(await detectLevel({FORCE_COLOR: '0', TF_BUILD: '1', AGENT_NAME: 'agent'}), '0');
+});
+
+test('a partly numeric `FORCE_COLOR` is treated as unset, not as a level', async t => {
+	for (const forceColor of [' 2', '2 ', '2abc', '+2', '1e1', '0x2']) {
+		// eslint-disable-next-line no-await-in-loop
+		const [piped, azure] = await Promise.all([
+			detectLevel({FORCE_COLOR: forceColor, COLORTERM: 'truecolor'}),
+			detectLevel({FORCE_COLOR: forceColor, TF_BUILD: '1', AGENT_NAME: 'agent'}),
+		]);
+
+		t.is(piped, '0', `FORCE_COLOR=${forceColor}`);
+		t.is(azure, '1', `FORCE_COLOR=${forceColor}`);
+	}
+});
+
+
+
+================================================
+FILE: test/instance.js
+================================================
+import test from 'ava';
+import chalk, {Chalk} from '../source/index.js';
+
+chalk.level = 1;
+
+test('create an isolated context where colors can be disabled (by level)', t => {
+	const instance = new Chalk({level: 0});
+	t.is(instance.red('foo'), 'foo');
+	t.is(chalk.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	instance.level = 2;
+	t.is(instance.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+});
+
+test('the `level` option should be a number from 0 to 3', t => {
+	/* eslint-disable no-new -- Ignore */
+	t.throws(() => {
+		new Chalk({level: 10});
+	}, {message: /should be an integer from 0 to 3/v});
+
+	t.throws(() => {
+		new Chalk({level: -1});
+	}, {message: /should be an integer from 0 to 3/v});
+	/* eslint-enable no-new */
+});
+
+test('an omitted `level` option is detected rather than rejected', t => {
+	t.is(new Chalk({level: undefined}).level, new Chalk().level);
+});
+
+test('assigning `level` is validated', t => {
+	const instance = new Chalk({level: 1});
+
+	// Unlike the option, `undefined` is not a way to ask for detection here
+	for (const level of [10, -1, 1.5, ' 1', undefined]) {
+		t.throws(() => {
+			instance.level = level;
+		}, {message: /should be an integer from 0 to 3/v}, `level: ${level}`);
+	}
+
+	// A style in the chain writes through to the instance, so it is validated too
+	t.throws(() => {
+		instance.red.level = 10;
+	}, {message: /should be an integer from 0 to 3/v});
+
+	t.is(instance.level, 1);
+
+	instance.level = 0;
+	t.is(instance.level, 0);
+	t.is(instance.red('foo'), 'foo');
+});
+
+test('a cached model style keeps following the level', t => {
+	const instance = new Chalk({level: 3});
+
+	// Reading it once installs the cached function on the instance
+	t.is(instance.rgb, instance.rgb);
+	t.is(instance.rgb(255, 0, 0)('foo'), '\u{1B}[38;2;255;0;0mfoo\u{1B}[39m');
+
+	instance.level = 1;
+	t.is(instance.rgb(255, 0, 0)('foo'), '\u{1B}[91mfoo\u{1B}[39m');
+
+	instance.level = 0;
+	t.is(instance.rgb(255, 0, 0)('foo'), 'foo');
+});
+
+test('a model style cached on a style in the chain keeps following the level', t => {
+	const instance = new Chalk({level: 3});
+	const {bold} = instance;
+
+	// The cache is installed on the builder here, not on the instance
+	t.is(bold.rgb, bold.rgb);
+	t.is(bold.rgb(255, 0, 0)('foo'), '\u{1B}[1m\u{1B}[38;2;255;0;0mfoo\u{1B}[39m\u{1B}[22m');
+
+	instance.level = 1;
+	t.is(bold.rgb(255, 0, 0)('foo'), '\u{1B}[1m\u{1B}[91mfoo\u{1B}[39m\u{1B}[22m');
+});
+
+test('a deep chain reads the level from the instance it started on', t => {
+	const instance = new Chalk({level: 1});
+	const chain = instance.red.bold.underline;
+
+	t.is(chain.level, 1);
+
+	instance.level = 0;
+	t.is(chain.level, 0);
+	t.is(chain('foo'), 'foo');
+
+	// Writing through the chain reaches the instance, however deep
+	chain.level = 2;
+	t.is(instance.level, 2);
+});
+
+
+
+================================================
+FILE: test/level.js
+================================================
+import {fileURLToPath} from 'node:url';
+import test from 'ava';
+import {execaNode} from 'execa';
+import chalk from '../source/index.js';
+
+chalk.level = 1;
+
+test('don\'t output colors when manually disabled', t => {
+	const oldLevel = chalk.level;
+	chalk.level = 0;
+	t.is(chalk.red('foo'), 'foo');
+	chalk.level = oldLevel;
+});
+
+test('enable/disable colors based on overall chalk .level property, not individual instances', t => {
+	const oldLevel = chalk.level;
+	chalk.level = 1;
+	const {red} = chalk;
+	t.is(red.level, 1);
+	chalk.level = 0;
+	t.is(red.level, chalk.level);
+	chalk.level = oldLevel;
+});
+
+test('propagate enable/disable changes from child colors', t => {
+	const oldLevel = chalk.level;
+	chalk.level = 1;
+	const {red} = chalk;
+	t.is(red.level, 1);
+	t.is(chalk.level, 1);
+	red.level = 0;
+	t.is(red.level, 0);
+	t.is(chalk.level, 0);
+	chalk.level = 1;
+	t.is(red.level, 1);
+	t.is(chalk.level, 1);
+	chalk.level = oldLevel;
+});
+
+test('disable colors if they are not supported', async t => {
+	const {stdout} = await execaNode(fileURLToPath(new URL('_fixture.js', import.meta.url)));
+	t.is(stdout, 'testout testerr');
+});
+
+
+
+================================================
+FILE: test/no-color-support.js
+================================================
+import test from 'ava';
+import chalk from '../source/index.js';
+
+// TODO: Do this when ESM supports loader hooks
+// Spoof supports-color
+// require('./_supports-color')(__dirname, {
+// 	stdout: {
+// 		level: 0,
+// 		hasBasic: false,
+// 		has256: false,
+// 		has16m: false
+// 	},
+// 	stderr: {
+// 		level: 0,
+// 		hasBasic: false,
+// 		has256: false,
+// 		has16m: false
+// 	}
+// });
+
+test('colors can be forced by using chalk.level', t => {
+	chalk.level = 1;
+	t.is(chalk.green('hello'), '\u{1B}[32mhello\u{1B}[39m');
+});
+
+
+
+================================================
+FILE: test/theme.js
+================================================
+import test from 'ava';
+import chalk, {Chalk, chalkStderr} from '../source/index.js';
+
+// Force a deterministic level so ANSI codes are predictable.
+chalk.level = 3;
+chalkStderr.level = 3;
+
+// === Default semantic styles ===
+
+test('expose default semantic styles: error, warn, info, success', t => {
+	t.is(typeof chalk.error, 'function');
+	t.is(typeof chalk.warn, 'function');
+	t.is(typeof chalk.info, 'function');
+	t.is(typeof chalk.success, 'function');
+});
+
+test('chalk.error wraps text in red + bold', t => {
+	t.is(chalk.error('boom'), '\u{1B}[31m\u{1B}[1mboom\u{1B}[22m\u{1B}[39m');
+});
+
+test('chalk.warn wraps text in yellow + bold', t => {
+	t.is(chalk.warn('careful'), '\u{1B}[33m\u{1B}[1mcareful\u{1B}[22m\u{1B}[39m');
+});
+
+test('chalk.info wraps text in blue', t => {
+	t.is(chalk.info('fyi'), '\u{1B}[34mfyi\u{1B}[39m');
+});
+
+test('chalk.success wraps text in green', t => {
+	t.is(chalk.success('done'), '\u{1B}[32mdone\u{1B}[39m');
+});
+
+test('semantic styles support multiple arguments', t => {
+	t.is(chalk.error('foo', 'bar'), '\u{1B}[31m\u{1B}[1mfoo bar\u{1B}[22m\u{1B}[39m');
+});
+
+test('semantic styles support falsy values', t => {
+	t.is(chalk.error(0), '\u{1B}[31m\u{1B}[1m0\u{1B}[22m\u{1B}[39m');
+});
+
+test('semantic styles are chainable with builtin styles: chalk.error.underline', t => {
+	t.is(chalk.error.underline('zap'), '\u{1B}[31m\u{1B}[1m\u{1B}[4mzap\u{1B}[24m\u{1B}[22m\u{1B}[39m');
+});
+
+test('semantic styles are chainable with builtin styles: chalk.success.bgBlack', t => {
+	t.is(chalk.success.bgBlack('ok'), '\u{1B}[32m\u{1B}[40mok\u{1B}[49m\u{1B}[39m');
+});
+
+test('semantic styles are chainable with multiple builtin styles', t => {
+	t.is(chalk.warn.italic.underline('careful'), '\u{1B}[33m\u{1B}[1m\u{1B}[3m\u{1B}[4mcareful\u{1B}[24m\u{1B}[23m\u{1B}[22m\u{1B}[39m');
+});
+
+// === Custom semantic styles via chalk.defineTheme ===
+
+test('register custom semantic styles with chalk.defineTheme({...})', t => {
+	chalk.defineTheme({myCustomStyle: 'bgCyan.black.underline', highlight: 'magenta.bold'});
+	t.is(typeof chalk.myCustomStyle, 'function');
+	t.is(typeof chalk.highlight, 'function');
+	t.is(chalk.myCustomStyle('hi'), '\u{1B}[46m\u{1B}[30m\u{1B}[4mhi\u{1B}[24m\u{1B}[39m\u{1B}[49m');
+	t.is(chalk.highlight('stand out'), '\u{1B}[35m\u{1B}[1mstand out\u{1B}[22m\u{1B}[39m');
+});
+
+test('register custom semantic style with array of style names', t => {
+	chalk.defineTheme({arrayTheme: ['green', 'bold']});
+	t.is(chalk.arrayTheme('yay'), '\u{1B}[32m\u{1B}[1myay\u{1B}[22m\u{1B}[39m');
+});
+
+test('register custom semantic style with single-element chain', t => {
+	chalk.defineTheme({onlyRed: 'red'});
+	t.is(chalk.onlyRed('x'), '\u{1B}[31mx\u{1B}[39m');
+});
+
+test('chalk.defineTheme({...}) returns chalk for chaining', t => {
+	t.is(chalk.defineTheme({}), chalk);
+	t.is(chalk.defineTheme({chainable: 'magenta'}), chalk);
+	t.is(chalk.chainable('x'), '\u{1B}[35mx\u{1B}[39m');
+});
+
+test('custom semantic styles are chainable with builtin styles', t => {
+	chalk.defineTheme({alert: 'yellow.bold'});
+	t.is(chalk.alert.underline('text'), '\u{1B}[33m\u{1B}[1m\u{1B}[4mtext\u{1B}[24m\u{1B}[22m\u{1B}[39m');
+});
+
+// === Level reactivity ===
+
+test('chalk.level = 0 disables colors for default semantic styles', t => {
+	const old = chalk.level;
+	chalk.level = 0;
+	t.is(chalk.error('boom'), 'boom');
+	t.is(chalk.warn('careful'), 'careful');
+	t.is(chalk.info('fyi'), 'fyi');
+	t.is(chalk.success('done'), 'done');
+	chalk.level = old;
+});
+
+test('chalk.level = 0 disables colors for custom semantic styles', t => {
+	chalk.defineTheme({reactTest: 'red.bold'});
+	const old = chalk.level;
+	chalk.level = 0;
+	t.is(chalk.reactTest('text'), 'text');
+	chalk.level = old;
+});
+
+test('level changes propagate even after the semantic style builder is cached', t => {
+	chalk.level = 3;
+	const {error} = chalk;
+	chalk.level = 0;
+	t.is(error('text'), 'text');
+	chalk.level = 3;
+	t.is(error('text'), '\u{1B}[31m\u{1B}[1mtext\u{1B}[22m\u{1B}[39m');
+});
+
+test('level changes propagate to chained semantic styles', t => {
+	chalk.level = 3;
+	const errorUnderline = chalk.error.underline;
+	chalk.level = 0;
+	t.is(errorUnderline('text'), 'text');
+	chalk.level = 3;
+	t.is(errorUnderline('text'), '\u{1B}[31m\u{1B}[1m\u{1B}[4mtext\u{1B}[24m\u{1B}[22m\u{1B}[39m');
+});
+
+// === Validation ===
+
+test('throw on unknown style in chain', t => {
+	t.throws(() => chalk.defineTheme({invalid: 'notarealstyle'}), {message: /Unknown or non-static style "notarealstyle"/v});
+});
+
+test('throw on dynamic (argument-taking) style rgb in chain', t => {
+	t.throws(() => chalk.defineTheme({dynamicRgb: 'rgb.bold'}), {message: /Unknown or non-static style "rgb"/v});
+});
+
+test('throw on dynamic style hex in chain', t => {
+	t.throws(() => chalk.defineTheme({dynamicHex: 'hex'}), {message: /Unknown or non-static style "hex"/v});
+});
+
+test('throw on dynamic style underlineAnsi256 in chain', t => {
+	t.throws(() => chalk.defineTheme({dynamicU256: 'underlineAnsi256'}), {message: /Unknown or non-static style "underlineAnsi256"/v});
+});
+
+test('throw when one link of the chain is invalid', t => {
+	t.throws(() => chalk.defineTheme({partiallyInvalid: 'red.notreal.bold'}), {message: /Unknown or non-static style "notreal"/v});
+});
+
+test('throw when the style name collides with a built-in style', t => {
+	t.throws(() => chalk.defineTheme({red: 'blue'}), {message: /Theme style name "red" collides with a built-in property/v});
+});
+
+test('throw when the style name collides with a base property', t => {
+	t.throws(() => chalk.defineTheme({level: 'red'}), {message: /Theme style name "level" collides with a built-in property/v});
+	t.throws(() => chalk.defineTheme({enabled: 'red'}), {message: /Theme style name "enabled" collides with a built-in property/v});
+	t.throws(() => chalk.defineTheme({constructor: 'red'}), {message: /Theme style name "constructor" collides with a built-in property/v});
+});
+
+test('throw when the style name collides with a default semantic style', t => {
+	t.throws(() => chalk.defineTheme({error: 'blue'}), {message: /Theme style name "error" collides with a built-in property/v});
+});
+
+test('throw when the style name collides with a chalk method', t => {
+	t.throws(() => chalk.defineTheme({theme: 'red'}), {message: /Theme style name "theme" collides with a built-in property/v});
+	t.throws(() => chalk.defineTheme({defineTheme: 'red'}), {message: /Theme style name "defineTheme" collides with a built-in property/v});
+});
+
+test('throw when registering a duplicate custom semantic style', t => {
+	chalk.defineTheme({myUnique: 'red'});
+	t.throws(() => chalk.defineTheme({myUnique: 'blue'}), {message: /Theme style name "myUnique" is already defined/v});
+});
+
+test('throw on empty array chain', t => {
+	t.throws(() => chalk.defineTheme({emptyArr: []}), {message: /Theme style chain cannot be empty/v});
+});
+
+test('throw on non-string/non-array chain definition', t => {
+	t.throws(() => chalk.defineTheme({numberDef: 42}), {message: /Theme style definition must be a string or an array of strings/v});
+});
+
+test('throw when the definitions argument is not an object', t => {
+	t.throws(() => chalk.defineTheme('nope'), {message: /Theme definitions must be an object of style names to style chains/v});
+});
+
+// === Instances ===
+
+test('default semantic styles are available on a new Chalk instance', t => {
+	const instance = new Chalk({level: 3});
+	t.is(instance.error('boom'), '\u{1B}[31m\u{1B}[1mboom\u{1B}[22m\u{1B}[39m');
+	t.is(instance.info('fyi'), '\u{1B}[34mfyi\u{1B}[39m');
+});
+
+test('semantic styles respect the instance level', t => {
+	const instance = new Chalk({level: 0});
+	t.is(instance.error('boom'), 'boom');
+	t.is(instance.success('done'), 'done');
+});
+
+test('default semantic styles are available on chalkStderr and respect chalkStderr.level', t => {
+	const old = chalkStderr.level;
+	chalkStderr.level = 3;
+	t.is(chalkStderr.error('boom'), '\u{1B}[31m\u{1B}[1mboom\u{1B}[22m\u{1B}[39m');
+	chalkStderr.level = 0;
+	t.is(chalkStderr.error('boom'), 'boom');
+	chalkStderr.level = old;
+});
+
+test('custom semantic styles are available on every instance', t => {
+	chalk.defineTheme({globalStyle: 'cyan.underline'});
+	t.is(typeof chalkStderr.globalStyle, 'function');
+	t.is(typeof new Chalk().globalStyle, 'function');
+	t.is(new Chalk({level: 3}).globalStyle('x'), '\u{1B}[36m\u{1B}[4mx\u{1B}[24m\u{1B}[39m');
+});
+
+// === Unicode ===
+
+test('Persian text passes through unchanged when wrapped in a semantic style', t => {
+	t.is(chalk.success('Ø¹Ù…Ù„ÛŒØ§Øª Ø§Ù†Ø¬Ø§Ù… Ø´Ø¯'), '\u{1B}[32mØ¹Ù…Ù„ÛŒØ§Øª Ø§Ù†Ø¬Ø§Ù… Ø´Ø¯\u{1B}[39m');
+	t.is(chalk.error('Ù…ØªÙ† Ø¯Ù„Ø®ÙˆØ§Ù‡ Ø´Ù…Ø§'), '\u{1B}[31m\u{1B}[1mÙ…ØªÙ† Ø¯Ù„Ø®ÙˆØ§Ù‡ Ø´Ù…Ø§\u{1B}[22m\u{1B}[39m');
+});
+
+// === Legacy `chalk.theme` API ===
+
+test('legacy: expose default themes: error, warn, info, success', t => {
+	t.is(typeof chalk.theme.error, 'function');
+	t.is(typeof chalk.theme.warn, 'function');
+	t.is(typeof chalk.theme.info, 'function');
+	t.is(typeof chalk.theme.success, 'function');
+});
+
+test('legacy: chalk.theme.error wraps text in red + bold', t => {
+	t.is(chalk.theme.error('boom'), '\u{1B}[31m\u{1B}[1mboom\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: chalk.theme.warn wraps text in yellow + bold', t => {
+	t.is(chalk.theme.warn('careful'), '\u{1B}[33m\u{1B}[1mcareful\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: chalk.theme.info wraps text in blue', t => {
+	t.is(chalk.theme.info('fyi'), '\u{1B}[34mfyi\u{1B}[39m');
+});
+
+test('legacy: chalk.theme.success wraps text in green', t => {
+	t.is(chalk.theme.success('done'), '\u{1B}[32mdone\u{1B}[39m');
+});
+
+test('legacy: chain theme with builtin style: theme.error.underline', t => {
+	t.is(chalk.theme.error.underline('zap'), '\u{1B}[31m\u{1B}[1m\u{1B}[4mzap\u{1B}[24m\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: chain theme with builtin style: theme.success.bgBlack', t => {
+	t.is(chalk.theme.success.bgBlack('ok'), '\u{1B}[32m\u{1B}[40mok\u{1B}[49m\u{1B}[39m');
+});
+
+test('legacy: chain theme with multiple builtin styles', t => {
+	t.is(chalk.theme.warn.italic.underline('careful'), '\u{1B}[33m\u{1B}[1m\u{1B}[3m\u{1B}[4mcareful\u{1B}[24m\u{1B}[23m\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: register custom theme with chalk.theme({...})', t => {
+	chalk.theme({legacyCool: 'bgCyan.black.underline', legacyAlert: 'red.bold'});
+	t.is(typeof chalk.theme.legacyCool, 'function');
+	t.is(typeof chalk.theme.legacyAlert, 'function');
+	t.is(chalk.theme.legacyCool('hi'), '\u{1B}[46m\u{1B}[30m\u{1B}[4mhi\u{1B}[24m\u{1B}[39m\u{1B}[49m');
+	t.is(chalk.theme.legacyAlert('be careful'), '\u{1B}[31m\u{1B}[1mbe careful\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: register custom theme with array of style names', t => {
+	chalk.theme({legacyArray: ['green', 'bold']});
+	t.is(chalk.theme.legacyArray('yay'), '\u{1B}[32m\u{1B}[1myay\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: register custom theme with single-element chain', t => {
+	chalk.theme({legacyOnlyRed: 'red'});
+	t.is(chalk.theme.legacyOnlyRed('x'), '\u{1B}[31mx\u{1B}[39m');
+});
+
+test('legacy: chalk.theme({...}) returns chalk.theme for chaining', t => {
+	const result = chalk.theme({legacyChainable: 'magenta'});
+	t.is(result, chalk.theme);
+	t.is(chalk.theme.legacyChainable('x'), '\u{1B}[35mx\u{1B}[39m');
+});
+
+test('legacy: chalk.level = 0 disables colors for default themes', t => {
+	const old = chalk.level;
+	chalk.level = 0;
+	t.is(chalk.theme.error('boom'), 'boom');
+	t.is(chalk.theme.warn('careful'), 'careful');
+	t.is(chalk.theme.info('fyi'), 'fyi');
+	t.is(chalk.theme.success('done'), 'done');
+	chalk.level = old;
+});
+
+test('legacy: chalk.level = 0 disables colors for custom themes', t => {
+	chalk.theme({legacyReact: 'red.bold'});
+	const old = chalk.level;
+	chalk.level = 0;
+	t.is(chalk.theme.legacyReact('text'), 'text');
+	chalk.level = old;
+});
+
+test('legacy: level changes propagate even after the theme builder is cached', t => {
+	chalk.level = 3;
+	const {warn} = chalk.theme;
+	chalk.level = 0;
+	t.is(warn('text'), 'text');
+	chalk.level = 3;
+	t.is(warn('text'), '\u{1B}[33m\u{1B}[1mtext\u{1B}[22m\u{1B}[39m');
+});
+
+test('legacy: level changes propagate to chained theme styles', t => {
+	const old = chalk.level;
+	chalk.level = 3;
+	const errorUnderline = chalk.theme.error.underline;
+	chalk.level = 0;
+	t.is(errorUnderline('text'), 'text');
+	chalk.level = old;
+});
+
+test('legacy: throw on unknown style in chain', t => {
+	t.throws(() => chalk.theme({legacyInvalid: 'notarealstyle'}), {message: /Unknown or non-static style "notarealstyle"/v});
+});
+
+test('legacy: throw on reserved theme name "level"', t => {
+	t.throws(() => chalk.theme({level: 'red'}), {message: /Theme name "level" is reserved/v});
+});
+
+test('legacy: throw on reserved theme name "theme"', t => {
+	t.throws(() => chalk.theme({theme: 'red'}), {message: /Theme name "theme" is reserved/v});
+});
+
+test('legacy: throw when registering a duplicate default theme', t => {
+	t.throws(() => chalk.theme({error: 'blue'}), {message: /Theme "error" is already defined/v});
+});
+
+test('legacy: throw when registering a duplicate custom theme', t => {
+	chalk.theme({legacyUnique: 'red'});
+	t.throws(() => chalk.theme({legacyUnique: 'blue'}), {message: /Theme "legacyUnique" is already defined/v});
+});
+
+test('legacy: throw on empty array chain', t => {
+	t.throws(() => chalk.theme({emptyArr: []}), {message: /Theme style chain cannot be empty/v});
+});
+
+test('legacy: throw on non-string/non-array chain definition', t => {
+	t.throws(() => chalk.theme({numberDef: 42}), {message: /Theme style definition must be a string or an array of strings/v});
+});
+
+test('legacy: chalk.theme called without arguments returns empty string', t => {
+	t.is(chalk.theme(), '');
+});
+
+test('legacy: chalk.theme called with a string returns plain text', t => {
+	t.is(chalk.theme('hello'), 'hello');
+	t.is(chalk.theme('hello', 'world'), 'hello world');
+});
+
+test('legacy: chalk.theme is callable as a function without registering', t => {
+	t.notThrows(() => chalk.theme('arbitrary text'));
+});
+
+test('legacy: custom themes registered on chalk do not leak to chalkStderr', t => {
+	chalk.level = 3;
+	chalkStderr.level = 3;
+	chalk.theme({legacyOnlyMain: 'magenta'});
+	t.is(typeof chalk.theme.legacyOnlyMain, 'function');
+	t.is(typeof chalkStderr.theme.legacyOnlyMain, 'undefined');
+});
+
+test('legacy: chalkStderr.theme.error is independent and respects chalkStderr.level', t => {
+	const old = chalkStderr.level;
+	chalkStderr.level = 3;
+	t.is(chalkStderr.theme.error('boom'), '\u{1B}[31m\u{1B}[1mboom\u{1B}[22m\u{1B}[39m');
+	chalkStderr.level = 0;
+	t.is(chalkStderr.theme.error('boom'), 'boom');
+	chalkStderr.level = old;
+});
+
+test('legacy: a new Chalk instance has its own theme', t => {
+	const instance = new Chalk({level: 3});
+	t.is(typeof instance.theme.error, 'function');
+	t.is(instance.theme.error('x'), '\u{1B}[31m\u{1B}[1mx\u{1B}[22m\u{1B}[39m');
+	instance.theme({legacyOnInstance: 'yellow'});
+	t.is(typeof instance.theme.legacyOnInstance, 'function');
+	t.is(typeof chalk.theme.legacyOnInstance, 'undefined');
+});
+
+test('legacy: Persian text passes through unchanged when wrapped in a theme', t => {
+	t.is(chalk.theme.success('Ø¹Ù…Ù„ÛŒØ§Øª Ø§Ù†Ø¬Ø§Ù… Ø´Ø¯'), '\u{1B}[32mØ¹Ù…Ù„ÛŒØ§Øª Ø§Ù†Ø¬Ø§Ù… Ø´Ø¯\u{1B}[39m');
+	t.is(chalk.theme.error('Ù…ØªÙ† Ø¯Ù„Ø®ÙˆØ§Ù‡ Ø´Ù…Ø§'), '\u{1B}[31m\u{1B}[1mÙ…ØªÙ† Ø¯Ù„Ø®ÙˆØ§Ù‡ Ø´Ù…Ø§\u{1B}[22m\u{1B}[39m');
+});
+
+
+
+================================================
+FILE: test/visible.js
+================================================
+import test from 'ava';
+import chalk, {Chalk} from '../source/index.js';
+
+chalk.level = 1;
+
+test('visible: normal output when level > 0', t => {
+	const instance = new Chalk({level: 3});
+	t.is(instance.visible.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.red.visible('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+});
+
+test('visible: no output when level is too low', t => {
+	const instance = new Chalk({level: 0});
+	t.is(instance.visible.red('foo'), '');
+	t.is(instance.red.visible('foo'), '');
+});
+
+test('test switching back and forth between level == 0 and level > 0', t => {
+	const instance = new Chalk({level: 3});
+	t.is(instance.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.visible.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.red.visible('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.visible('foo'), 'foo');
+	t.is(instance.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+
+	instance.level = 0;
+	t.is(instance.red('foo'), 'foo');
+	t.is(instance.visible('foo'), '');
+	t.is(instance.visible.red('foo'), '');
+	t.is(instance.red.visible('foo'), '');
+	t.is(instance.red('foo'), 'foo');
+
+	instance.level = 3;
+	t.is(instance.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.visible.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.red.visible('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+	t.is(instance.visible('foo'), 'foo');
+	t.is(instance.red('foo'), '\u{1B}[31mfoo\u{1B}[39m');
+});
+
+
+
+================================================
+FILE: .github/funding.yml
+================================================
+github: [sindresorhus, Qix-]
+open_collective: sindresorhus
+tidelift: npm/chalk
+custom: https://sindresorhus.com/donate
+
+
+
+================================================
+FILE: .github/security.md
+================================================
+# Security Policy
+
+To report a security vulnerability, please use the [Tidelift security contact](https://tidelift.com/security). Tidelift will coordinate the fix and disclosure.
+
+
+
+================================================
+FILE: .github/workflows/main.yml
+================================================
+name: CI
+on:
+  - push
+  - pull_request
+jobs:
+  test:
+    name: Node.js ${{ matrix.node-version }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version:
+          - 26
+          - 22
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+      - run: npm install
+      - run: npm test
+
+
