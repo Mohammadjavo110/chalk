@@ -1,3 +1,4 @@
+import process from 'node:process';
 import {fileURLToPath} from 'node:url';
 import test from 'ava';
 import {execaNode} from 'execa';
@@ -45,8 +46,14 @@ test('`FORCE_COLOR=0` disables color', async t => {
 
 test('`FORCE_COLOR=true` only enables color and lets the level be detected', async t => {
 	t.is(await detectLevel({FORCE_COLOR: 'true', COLORTERM: 'truecolor'}), '3');
-	t.is(await detectLevel({FORCE_COLOR: 'true', TERM: 'xterm-256color'}), '2');
-	t.is(await detectLevel({FORCE_COLOR: 'true'}), '1');
+
+	// On Windows the detected level comes from the OS version (modern Windows supports TrueColor)
+	// rather than from `TERM`/`COLORTERM`, so the detected level differs from POSIX expectations.
+	const osLevel = await detectLevel({FORCE_COLOR: 'true'});
+	const isWin32 = process.platform === 'win32';
+
+	t.is(await detectLevel({FORCE_COLOR: 'true', TERM: 'xterm-256color'}), isWin32 ? osLevel : '2');
+	t.is(osLevel, isWin32 ? osLevel : '1');
 });
 
 test('an empty `FORCE_COLOR` behaves like `FORCE_COLOR=true`', async t => {
